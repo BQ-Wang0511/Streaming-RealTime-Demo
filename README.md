@@ -2,6 +2,8 @@
 
 This browser demo generates talking-head video in real time. Animate an image using uploaded audio or a live microphone, dub a source video while preserving its pose and timing, or connect a chat agent for interactive speech-driven animation. Preset habit IDs let you switch between speaking styles without a reference video.
 
+![TalkLikeYou streaming demo interface](assets/demo-interface.png)
+
 [Project Page](https://bq-wang0511.github.io/TalkLikeYou/) · [Hugging Face](https://huggingface.co/doubi-killer/TalkLikeYou) · [TalkLikeYou Public Code](https://github.com/BQ-Wang0511/TalkLikeYou)
 
 Paper: coming soon.
