@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.idea/
+.vscode/
+build/
+dist/
+*.log
+.env
+checkpoints/*
+!checkpoints/runtime_config.pkl
