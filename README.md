@@ -1,4 +1,4 @@
-# Talk Like You Real-Time Demo
+# Streaming RealTime Demo
 
 This browser demo generates talking-head video in real time. Animate an image using uploaded audio or a live microphone, dub a source video while preserving its pose and timing, or connect a chat agent for interactive speech-driven animation. Preset habit IDs let you switch between speaking styles without a reference video.
 
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 ## Run
 
 ```bash
-cd TalkLikeYou-Realtime-Demo
+cd Streaming-RealTime-Demo
 CUDA_VISIBLE_DEVICES=0 python app.py --host 0.0.0.0 --port 5070
 ```
 
