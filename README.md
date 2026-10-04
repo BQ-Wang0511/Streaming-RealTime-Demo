@@ -36,7 +36,7 @@ pip install -r requirements.txt
 ## Run
 
 ```bash
-cd Streaming-RealTime-Demo
+cd TalkLikeYou-Streaming-RealTime-Demo
 CUDA_VISIBLE_DEVICES=0 python app.py --host 0.0.0.0 --port 5070
 ```
 
