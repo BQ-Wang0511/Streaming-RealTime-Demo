@@ -1,0 +1,11 @@
+import numpy as np
+import os
+
+def make_ext(modname, pyxfilename):
+    from distutils.extension import Extension
+
+    return Extension(name=modname,
+                     sources=[pyxfilename, os.path.join(os.path.dirname(pyxfilename), "blend_impl.c")],
+                     include_dirs=[np.get_include(), os.path.dirname(pyxfilename)],
+                     extra_compile_args=["-O3", "-std=c99", "-march=native", "-ffast-math"],
+                    )

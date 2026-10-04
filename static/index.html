@@ -1,0 +1,3021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalkLikeYou — Real-time Talking Head</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #06080f;
+    --surface: rgba(17,22,32,0.6);
+    --border: rgba(255,255,255,0.06);
+    --border-light: rgba(255,255,255,0.1);
+    --text: #cdd4e4;
+    --text-dim: #5e698a;
+    --text-muted: #3e4660;
+    --accent: #6a9fff;
+    --accent-glow: rgba(106,159,255,0.2);
+    --accent-dim: #3a5fa0;
+    --danger: #ff6b7a;
+    --success: #5eeab4;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font-mono: 'DM Mono', monospace;
+    --font-display: 'Instrument Serif', serif;
+    --font-body: 'Space Grotesk', sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.55;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(ellipse at 50% -20%, rgba(106,159,255,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse at 80% 30%, rgba(94,234,180,0.03) 0%, transparent 50%);
+  }
+
+  body::after {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:9999;
+    opacity:0.02;
+    background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  }
+
+  .app { max-width:1500px; margin:0 auto; padding:24px 28px 16px; display:flex; flex-direction:column; gap:20px; min-height:100vh; }
+
+  .header {
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:14px 20px;
+    backdrop-filter:blur(20px);
+    background:rgba(17,22,32,0.5);
+    border-radius:var(--radius);
+    border:1px solid var(--border);
+  }
+  .header h1 {
+    font-family:var(--font-display); font-size:1.8rem; font-weight:400;
+    font-style:italic; color:#fff; letter-spacing:-0.03em;
+  }
+  .header-brand { min-width:0; }
+  .header .meta {
+    display:block; margin-top:2px;
+    font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+    text-transform:uppercase; letter-spacing:0.12em;
+  }
+
+  .workspace {
+    display:grid; grid-template-columns:minmax(420px,1fr) minmax(480px,620px);
+    align-items:start; gap:22px; min-width:0;
+  }
+
+  .center-stage {
+    display:flex; flex-direction:column; justify-content:flex-start;
+    position:sticky; top:20px; min-width:0;
+  }
+
+  .display-area {
+    position:relative;
+    background:radial-gradient(circle at center, rgba(106,159,255,0.06), rgba(0,0,0,1) 70%);
+    border-radius:var(--radius); overflow:hidden;
+    border:1px solid rgba(106,159,255,0.15);
+    aspect-ratio:16/10; min-height:360px;
+    box-shadow:
+      0 0 80px rgba(106,159,255,0.08),
+      inset 0 0 60px rgba(0,0,0,0.7);
+    transition:all 0.6s var(--ease);
+  }
+  .display-area.active { box-shadow:0 0 100px rgba(106,159,255,0.12),inset 0 0 60px rgba(0,0,0,0.5); }
+  .display-area.streaming {
+    animation:glowPulse 2s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%,100% { box-shadow:0 0 40px rgba(106,159,255,0.08),inset 0 0 60px rgba(0,0,0,0.7); }
+    50%     { box-shadow:0 0 90px rgba(106,159,255,0.18),inset 0 0 60px rgba(0,0,0,0.7); }
+  }
+
+  .display-area::before {
+    content:''; position:absolute; inset:0; pointer-events:none; z-index:2;
+    background:linear-gradient(180deg,rgba(0,0,0,0.2) 0%,transparent 40%,transparent 60%,rgba(0,0,0,0.2) 100%);
+  }
+
+  .display-area img { width:100%; height:100%; object-fit:contain; display:block; position:relative; z-index:1; }
+
+  .display-placeholder {
+    position:absolute; inset:0; display:flex; z-index:1;
+    flex-direction:column; align-items:center; justify-content:center;
+    color:var(--text-muted); pointer-events:none;
+  }
+  .display-placeholder .icon { font-size:56px; margin-bottom:16px; opacity:0.15; }
+  .display-placeholder .text {
+    font-family:var(--font-body); font-size:11px; font-weight:500;
+    letter-spacing:0.08em; text-transform:uppercase;
+  }
+
+  .display-overlay { position:absolute; top:12px; right:12px; display:flex; gap:8px; pointer-events:none; z-index:3; }
+  .badge {
+    font-family:var(--font-mono); font-size:9px; font-weight:500;
+    padding:4px 10px; border-radius:20px; letter-spacing:0.05em;
+    backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.06);
+  }
+  .badge-fps { background:rgba(0,0,0,0.7); color:var(--success); }
+  .badge-source { background:rgba(0,0,0,0.7); color:var(--accent); }
+  .badge-live {
+    background:linear-gradient(90deg,#ff4d6d,#ff8fa3); color:#fff; border:none;
+    box-shadow:0 0 16px rgba(255,77,109,0.3);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+  .control-dock {
+    display:flex; flex-direction:column; gap:12px;
+    position:relative; min-width:0;
+  }
+
+  .source-strip {
+    display:flex; gap:8px; overflow-x:auto; padding:4px 0 8px;
+    scroll-behavior:smooth; align-items:flex-end;
+  }
+  .source-strip::-webkit-scrollbar { height:2px; }
+  .source-strip::-webkit-scrollbar-track { background:transparent; }
+  .source-strip::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+
+  .source-card {
+    flex-shrink:0; width:88px; cursor:pointer;
+    border-radius:var(--radius-sm); overflow:hidden;
+    border:1.5px solid rgba(255,255,255,0.04);
+    backdrop-filter:blur(12px); background:rgba(17,22,32,0.55);
+    transition:all 0.3s var(--ease); position:relative;
+  }
+  .source-card:hover {
+    transform:translateY(-6px) scale(1.03);
+    box-shadow:0 10px 30px rgba(0,0,0,0.5),0 0 20px rgba(106,159,255,0.15);
+    border-color:rgba(106,159,255,0.3);
+  }
+  .source-card.active {
+    border-color:var(--accent);
+    box-shadow:0 0 0 2px var(--accent-glow),0 8px 24px rgba(0,0,0,0.4);
+  }
+  .source-card img { width:100%; height:88px; object-fit:cover; display:block; }
+  .source-card video { width:100%; height:88px; object-fit:cover; display:block; }
+  .source-card .name {
+    font-family:var(--font-body); font-size:8px; font-weight:500;
+    padding:4px 5px; text-align:center; color:var(--text-dim);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .source-card.active .name { color:var(--accent); }
+  .source-card .remove {
+    position:absolute; top:4px; right:4px; width:18px; height:18px;
+    border-radius:50%; background:rgba(0,0,0,0.8); color:var(--danger);
+    border:none; font-size:11px; cursor:pointer; display:none;
+    align-items:center; justify-content:center; transition:background 0.2s;
+  }
+  .source-card .remove:hover { background:var(--danger); color:#fff; }
+  .source-card:hover .remove { display:flex; }
+  .source-card .avatar-actions {
+    position:absolute; left:4px; right:4px; top:64px; display:flex; gap:3px;
+    z-index:2;
+  }
+  .source-card .avatar-action {
+    flex:1; min-width:0; height:19px; padding:0 2px;
+    border:1px solid rgba(106,159,255,.45); border-radius:4px;
+    background:rgba(5,8,15,.86); color:var(--accent); cursor:pointer;
+    font:600 7px var(--font-body);
+  }
+  .source-card .avatar-action:hover:not(:disabled) {
+    background:var(--accent); color:#06080f;
+  }
+  .source-card .avatar-action:disabled { cursor:default; }
+  .source-card .avatar-action.ready {
+    border-color:rgba(94,234,180,.45); color:var(--success);
+  }
+  .source-card .avatar-action.failed {
+    border-color:rgba(255,107,122,.45); color:var(--danger);
+  }
+  .registration-progress {
+    position:absolute; left:0; right:0; top:84px; height:4px;
+    background:rgba(0,0,0,.72); z-index:3;
+  }
+  .registration-progress span {
+    display:block; width:0; height:100%; background:var(--accent);
+    transition:width .25s ease;
+  }
+
+  .add-source {
+    flex-shrink:0; width:88px; height:88px;
+    border:1.5px dashed rgba(255,255,255,0.08); border-radius:var(--radius-sm);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--text-muted); font-size:26px; font-weight:300;
+    transition:all 0.3s var(--ease);
+    backdrop-filter:blur(12px); background:rgba(17,22,32,0.4);
+  }
+  .add-source:hover { border-color:var(--accent-dim); color:var(--accent); background:rgba(106,159,255,0.08); }
+  .add-source input { display:none; }
+
+  .audio-strip {
+    display:flex; gap:8px; overflow-x:auto; padding:4px 0 8px;
+    scroll-behavior:smooth; align-items:flex-end;
+  }
+  .audio-strip::-webkit-scrollbar { height:2px; }
+  .audio-strip::-webkit-scrollbar-track { background:transparent; }
+  .audio-strip::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  .audio-card {
+    flex-shrink:0; width:120px; cursor:pointer;
+    border-radius:var(--radius-sm); overflow:hidden;
+    border:1.5px solid rgba(255,255,255,0.04);
+    backdrop-filter:blur(12px); background:rgba(17,22,32,0.55);
+    transition:all 0.3s var(--ease); position:relative; padding:10px 12px;
+  }
+  .audio-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.5),0 0 16px rgba(94,234,180,0.1); }
+  .audio-card.active { border-color:var(--success); box-shadow:0 0 0 2px rgba(94,234,180,0.2); }
+  .microphone-card {
+    height:72px; color:var(--text); text-align:left;
+    font-family:var(--font-body);
+  }
+  .microphone-card .mic-icon {
+    display:block; color:var(--success); font-size:17px; line-height:20px;
+  }
+  .microphone-card .name, .microphone-card .size { display:block; }
+  .microphone-card:disabled { opacity:.35; cursor:not-allowed; transform:none; }
+  .microphone-card.live .mic-icon {
+    color:var(--danger); animation:pulse 1.1s ease-in-out infinite;
+  }
+  .audio-card .name {
+    font-family:var(--font-body); font-size:10px; font-weight:500;
+    color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .audio-card .size { font-size:9px; color:var(--text-dim); margin-top:2px; }
+  .audio-card .send-chunk {
+    width:100%; height:22px; margin-top:7px; padding:0 6px;
+    border:1px solid rgba(94,234,180,.35); border-radius:4px;
+    background:rgba(94,234,180,.08); color:var(--success); cursor:pointer;
+    font:600 8px var(--font-body);
+  }
+  .audio-card .send-chunk:hover:not(:disabled) {
+    background:var(--success); color:#06080f;
+  }
+  .audio-card .send-chunk:disabled { opacity:.35; cursor:not-allowed; }
+  .audio-card .remove {
+    position:absolute; top:4px; right:4px; width:18px; height:18px;
+    border-radius:50%; background:rgba(0,0,0,0.8); color:var(--danger);
+    border:none; font-size:11px; cursor:pointer; display:none;
+    align-items:center; justify-content:center;
+  }
+  .audio-card .remove:hover { background:var(--danger); color:#fff; }
+  .audio-card:hover .remove { display:flex; }
+  audio { height:28px; border-radius:var(--radius-sm); flex-shrink:0; }
+
+  .mode-switch {
+    display:inline-grid; grid-template-columns:repeat(3,1fr); align-self:flex-start;
+    padding:3px; border:1px solid var(--border-light); border-radius:7px;
+    background:rgba(0,0,0,.28);
+  }
+  .mode-btn {
+    min-width:112px; height:30px; padding:0 14px; border:0; border-radius:5px;
+    background:transparent; color:var(--text-dim); cursor:pointer;
+    font:600 10px var(--font-body);
+  }
+  .mode-btn.active { background:rgba(106,159,255,.16); color:var(--accent); }
+  .mode-btn:disabled { opacity:.35; cursor:not-allowed; }
+  .conversation-panel {
+    display:flex; flex-direction:column; gap:10px;
+    border-top:1px solid var(--border); padding-top:12px;
+  }
+  .conversation-panel[hidden] { display:none; }
+  .conversation-head {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .conversation-model {
+    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    color:var(--text-dim); font:10px var(--font-mono);
+  }
+  .text-action {
+    border:0; background:transparent; color:var(--text-dim); cursor:pointer;
+    font:600 10px var(--font-body);
+  }
+  .text-action:hover { color:var(--text); }
+  .chat-messages {
+    display:flex; flex-direction:column; gap:7px; max-height:190px;
+    overflow-y:auto; padding:2px 4px 2px 0;
+  }
+  .chat-empty { color:var(--text-muted); font-size:10px; padding:10px 0; }
+  .chat-message {
+    max-width:82%; padding:8px 11px; border-radius:6px;
+    white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px;
+  }
+  .chat-message.user {
+    align-self:flex-end; color:#f4f7ff; background:rgba(106,159,255,.18);
+    border:1px solid rgba(106,159,255,.2);
+  }
+  .chat-message.assistant {
+    align-self:flex-start; color:var(--text); background:rgba(255,255,255,.045);
+    border:1px solid var(--border);
+  }
+  .chat-message.pending::after {
+    content:'|'; color:var(--accent); animation:cursorBlink .8s steps(1) infinite;
+  }
+  @keyframes cursorBlink { 50% { opacity:0; } }
+  .composer {
+    display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px;
+    align-items:end;
+  }
+  .composer textarea {
+    width:100%; min-height:42px; max-height:112px; resize:vertical;
+    border:1px solid var(--border-light); border-radius:6px;
+    background:rgba(0,0,0,.3); color:var(--text); padding:10px 11px;
+    font:12px/1.45 var(--font-body); outline:none;
+  }
+  .composer textarea:focus { border-color:var(--accent-dim); }
+  .composer .btn { height:42px; padding:0 16px; }
+  .record-btn.recording { border-color:var(--danger); color:var(--danger); }
+  .conversation-options summary {
+    cursor:pointer; color:var(--text-muted); font-size:9px;
+  }
+  .conversation-options-grid {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(120px,1fr));
+    gap:10px; padding-top:8px;
+  }
+  .conversation-options-grid .system-prompt { grid-column:span 2; }
+  .conversation-options textarea,
+  .conversation-options input,
+  .conversation-options select {
+    width:100%; min-height:34px; border:1px solid var(--border-light);
+    border-radius:5px; background:rgba(0,0,0,.3); color:var(--text);
+    padding:7px 8px; font:10px var(--font-body);
+  }
+  .conversation-options input:disabled {
+    opacity:.4; cursor:not-allowed;
+  }
+  .conversation-options .conversation-toggle input {
+    width:18px; min-height:18px; margin-top:7px; accent-color:var(--accent);
+  }
+
+  .settings {
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    padding:10px 0;
+  }
+  .settings summary { cursor:pointer; color:var(--text-dim); font-size:10px; font-weight:600; }
+  .settings-grid {
+    display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)); gap:10px 14px;
+    padding-top:12px;
+  }
+  .setting { display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .setting span { font-size:9px; color:var(--text-dim); }
+  .setting input[type="number"] {
+    width:100%; height:32px; border:1px solid var(--border-light); border-radius:5px;
+    background:rgba(0,0,0,.3); color:var(--text); padding:0 8px; font-family:var(--font-mono);
+  }
+  .toggle-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; min-height:32px; }
+  .toggle-row label { display:flex; align-items:center; gap:6px; color:var(--text-dim); font-size:10px; }
+  .controls {
+    display:flex; gap:10px; align-items:center;
+    padding:12px 18px;
+    backdrop-filter:blur(20px); background:rgba(17,22,32,0.55);
+    border-radius:16px; border:1px solid rgba(255,255,255,0.08);
+  }
+  .btn {
+    font-family:var(--font-body); font-size:12px; font-weight:600;
+    padding:10px 20px; border-radius:8px; cursor:pointer;
+    border:1px solid transparent; transition:all 0.2s var(--ease);
+    letter-spacing:0.02em;
+  }
+  .btn-primary {
+    background:var(--accent); color:#06080f; border-color:var(--accent);
+  }
+  .btn-primary:hover:not(:disabled) { filter:brightness(1.1); box-shadow:0 4px 20px var(--accent-glow); }
+  .btn-primary:disabled { opacity:0.2; cursor:not-allowed; filter:none; }
+  .btn-ghost {
+    background:transparent; border-color:rgba(255,255,255,0.1); color:var(--text-dim);
+  }
+  .btn-ghost:hover { border-color:var(--text-dim); color:var(--text); }
+  .status-text {
+    flex:1; font-size:10px; color:var(--text-dim);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .system-actions {
+    display:flex; flex-direction:column; gap:5px; flex:0 0 auto;
+  }
+  .system-action {
+    min-width:104px; height:27px; padding:0 10px; border-radius:6px;
+    border:1px solid rgba(255,255,255,.1); background:rgba(0,0,0,.2);
+    color:var(--text-dim); cursor:pointer; font:600 9px var(--font-body);
+  }
+  .system-action:hover:not(:disabled) {
+    border-color:var(--accent-dim); color:var(--accent);
+  }
+  .system-action.danger:hover:not(:disabled) {
+    border-color:var(--danger); color:var(--danger);
+  }
+  .system-action:disabled { opacity:.35; cursor:not-allowed; }
+
+  .row-label {
+    font-family:var(--font-body); font-size:8px; font-weight:600;
+    text-transform:uppercase; letter-spacing:0.14em;
+    color:var(--text-muted); margin-bottom:6px;
+  }
+  .source-head {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .source-head .text-action { margin-bottom:6px; }
+  .text-action:disabled { opacity:.35; cursor:not-allowed; }
+
+  .vid-tag {
+    position:absolute; top:3px; left:3px;
+    background:var(--accent); color:#06080f;
+    font-family:var(--font-body); font-size:7px; font-weight:700;
+    padding:1px 5px; border-radius:3px; letter-spacing:0.06em;
+  }
+
+  @media (max-width:800px) {
+    .app { padding:16px 12px; gap:14px; }
+    .header { flex-wrap:wrap; }
+    .mode-switch { width:100%; }
+    .display-area { min-height:280px; }
+    .settings-grid { grid-template-columns:repeat(2,minmax(110px,1fr)); }
+    .conversation-options-grid { grid-template-columns:1fr; }
+    .composer { grid-template-columns:minmax(0,1fr) auto; }
+    .composer .send-btn { grid-column:1 / -1; }
+    .chat-message { max-width:92%; }
+    .header .meta { display:none; }
+    .mode-btn { min-width:0; padding:0 8px; }
+  }
+  @media (max-width:1100px) {
+    .workspace { display:flex; flex-direction:column; }
+    .control-dock { order:1; width:100%; }
+    .center-stage { order:2; position:relative; top:auto; width:100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="header-brand">
+      <h1>TalkLikeYou</h1>
+      <span class="meta">Real-time Talking Head &nbsp;·&nbsp; Streaming</span>
+    </div>
+    <div class="mode-switch" aria-label="Input mode">
+      <button class="mode-btn active" id="audioModeBtn" type="button">Audio</button>
+      <button class="mode-btn" id="videoModeBtn" type="button">Video dubbing</button>
+      <button class="mode-btn" id="conversationModeBtn" type="button">Chat agent</button>
+    </div>
+  </div>
+
+  <main class="workspace">
+  <div class="center-stage">
+    <div class="display-area" id="display">
+      <img id="frame" alt="stream">
+      <div class="display-placeholder" id="placeholder">
+        <span class="icon">&#9679;</span>
+        <span class="text">Ready &mdash; add sources &amp; audio, then Start</span>
+      </div>
+      <div class="display-overlay" id="overlay">
+        <span class="badge badge-live" id="liveBadge" style="display:none">LIVE</span>
+        <span class="badge badge-fps" id="fpsBadge" style="display:none">0 fps</span>
+        <span class="badge badge-source" id="sourceBadge">&mdash;</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="control-dock">
+    <div class="source-head">
+      <div class="row-label" id="sourcePoolLabel">Image avatars</div>
+      <button class="text-action" id="clearAvatarCacheBtn" type="button">Clear cache</button>
+    </div>
+    <div class="source-strip" id="sourceStrip">
+      <label class="add-source" title="Add source image/video">
+        +<input type="file" id="sourceInput" accept="image/*" multiple>
+      </label>
+    </div>
+
+    <div id="audioModePanel">
+      <div class="audio-strip" id="audioStrip">
+        <button class="audio-card microphone-card" id="microphoneInputBtn" type="button" title="Live playback is enabled; headphones are recommended">
+          <span class="mic-icon">&#9679;</span>
+          <span class="name">Live microphone</span>
+          <span class="size">Live · use headphones</span>
+        </button>
+        <label class="add-source" title="Add audio files" style="height:72px;">&#9835;<input type="file" id="audioInput" accept="audio/*" multiple></label>
+      </div>
+    </div>
+
+    <section class="conversation-panel" id="conversationPanel" hidden>
+      <div class="conversation-head">
+        <span class="conversation-model" id="conversationModel">Conversation service</span>
+        <button class="text-action" id="clearChatBtn" type="button">Clear</button>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="chat-empty" id="chatEmpty">Start a new conversation.</div>
+      </div>
+      <div class="composer">
+        <textarea id="chatInput" rows="2" maxlength="8000" placeholder="Type a message"></textarea>
+        <button class="btn btn-ghost record-btn" id="recordBtn" type="button" title="Record voice">Record</button>
+        <button class="btn btn-primary send-btn" id="sendBtn" type="button">Send</button>
+      </div>
+      <details class="conversation-options">
+        <summary>Conversation settings</summary>
+        <div class="conversation-options-grid">
+          <label class="setting system-prompt"><span>System prompt</span><textarea id="systemPrompt" rows="2" placeholder="Use server default"></textarea></label>
+          <label class="setting"><span>LLM model</span><input id="llmModel" type="text" list="llmModelOptions" placeholder="Use server default"><datalist id="llmModelOptions"></datalist></label>
+          <label class="setting"><span>TTS provider</span><select id="ttsProvider"></select></label>
+          <label class="setting"><span>TTS model</span><input id="ttsModel" type="text" list="ttsModelOptions" placeholder="Not used by Edge TTS"><datalist id="ttsModelOptions"></datalist></label>
+          <label class="setting"><span>TTS voice</span><select id="ttsVoice"></select></label>
+          <label class="setting conversation-toggle"><span>Streaming TTS</span><input id="streamingTts" type="checkbox" checked title="Start playback and motion generation as soon as each speech segment is ready"></label>
+        </div>
+      </details>
+    </section>
+    <audio id="audioPlayer" controls hidden></audio>
+
+    <details class="settings">
+      <summary>Motion settings</summary>
+      <div class="settings-grid">
+        <label class="setting"><span>Lip person ID</span><input id="lipPersonId" type="number" min="0" value="192"></label>
+        <label class="setting"><span>Lip guidance</span><input id="lipGuidance" type="number" min="0" step="0.1" value="1.3"></label>
+        <label class="setting" id="posePersonIdSetting"><span>Pose person ID</span><input id="posePersonId" type="number" min="0" value="274"></label>
+        <label class="setting" id="poseGuidanceSetting"><span>Pose guidance</span><input id="poseGuidance" type="number" min="0" step="0.1" value="1.5"></label>
+        <label class="setting"><span>Sampling steps</span><input id="samplingSteps" type="number" min="1" value="1"></label>
+        <label class="setting"><span>Motion chunk (frames)</span><input id="streamFrames" type="number" min="1" value="50"></label>
+        <label class="setting"><span>Preview FPS</span><input id="previewFps" type="number" min="1" max="50" step="1" value="25"></label>
+        <label class="setting"><span>Max image size (long edge)</span><input id="maxImageSize" type="number" min="64" max="4096" step="64" value="1024"></label>
+        <label class="setting"><span>Face index</span><input id="faceIdx" type="number" min="0" step="1" value="0" title="Detected faces are indexed from left to right"></label>
+        <label class="setting"><span>Crop scale</span><input id="cropScale" type="number" min="0.1" step="0.1" value="2.3" title="Larger values include a wider area around the face"></label>
+        <label class="setting"><span>Playback buffer (frames)</span><input id="playbackBufferFrames" type="number" min="1" step="1" value="75"></label>
+        <label class="setting"><span>Audio chunk (seconds)</span><input id="audioChunkSeconds" type="number" min="0.1" step="0.1" value="1.0"></label>
+        <div class="toggle-row">
+          <label><input id="stage0" type="checkbox" checked> Stage0</label>
+          <label><input id="neutral" type="checkbox" checked> Neutral</label>
+          <label id="perFrameNormalizeDeltaRow" hidden><input id="perFrameNormalizeDelta" type="checkbox"> Per-frame normalize ΔE</label>
+          <label id="dittoPoseRow"><input id="dittoPose" type="checkbox" checked> Ditto pose</label>
+          <label><input id="pasteBack" type="checkbox" checked> Paste back</label>
+          <label><input id="continuousIdle" type="checkbox"> Continuous idle</label>
+          <label id="microphonePlaybackRow" hidden><input id="microphonePlayback" type="checkbox" checked> Play microphone audio</label>
+        </div>
+      </div>
+    </details>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn" disabled>Start Streaming</button>
+      <button class="btn btn-ghost" id="stopBtn" disabled>Stop</button>
+      <span class="status-text" id="statusText">Upload source &amp; audio to begin</span>
+      <div class="system-actions">
+        <button class="system-action" id="unloadModelsBtn" type="button">Release VRAM</button>
+        <button class="system-action danger" id="shutdownServiceBtn" type="button">Exit service</button>
+      </div>
+    </div>
+  </div>
+  </main>
+
+</div>
+
+<script>
+const state = {
+  sources: [],
+  activeSourceIds: {
+    standard: null,
+    video: null,
+  },
+  get activeSourceId() {
+    return this.activeSourceIds[this.mode === 'video' ? 'video' : 'standard'];
+  },
+  set activeSourceId(value) {
+    this.activeSourceIds[this.mode === 'video' ? 'video' : 'standard'] = value;
+  },
+  audioPath: null,
+  audioUrl: null,
+  audioFileName: null,
+  microphoneSelected: false,
+  microphoneStreaming: false,
+  microphoneFinishing: false,
+  ws: null,
+  streaming: false,
+  frameCount: 0,
+  fpsTimer: 0,
+  activeSourceName: '—',
+  mode: 'audio',
+  conversationBusy: false,
+  conversationConfigured: false,
+  sttConfigured: false,
+  chatAbort: null,
+  clearingAvatarCache: false,
+  systemBusy: false,
+  serviceStopping: false,
+  modelsLoaded: true,
+  conversationOptions: {
+    ttsModels: {},
+    ttsVoices: {},
+  },
+};
+state.conversationId = localStorage.getItem('talklikeyou_conversation_id')
+  || (crypto.randomUUID ? crypto.randomUUID() : `conversation_${Date.now()}`);
+localStorage.setItem('talklikeyou_conversation_id', state.conversationId);
+
+function saveState() {
+  const d = {
+    srcs: state.sources.map(s => ({
+      id: s.id,
+      name: s.name,
+      path: s.path,
+      url: s.url,
+      avatarId: s.avatarId,
+      registered: s.registered,
+      neutralized: s.neutralized,
+      isVideo: s.isVideo,
+    })),
+    actSrcStandard: state.activeSourceIds.standard,
+    actSrcVideo: state.activeSourceIds.video,
+    audios: state.audioFiles.map(a => ({ id: a.id, name: a.name, path: a.path, url: a.url })),
+    actAud: state.activeAudioId,
+    faceIdx: Math.max(0, Math.round(+$('faceIdx').value || 0)),
+    cropScale: Math.max(0.1, +$('cropScale').value || 2.3),
+    streamingTts: $('streamingTts').checked,
+  };
+  localStorage.setItem('talklikeyou', JSON.stringify(d));
+}
+function loadState() {
+  fetch('/api/status').then(r => r.json()).then(s => {
+    const conversation = s.conversation || {};
+    state.conversationConfigured = !!(
+      conversation.llm_configured && conversation.tts_configured
+    );
+    state.sttConfigured = !!conversation.stt_configured;
+    state.modelsLoaded = s.models_loaded !== false;
+    populateDatalist('llmModelOptions', conversation.llm_models || []);
+    $('llmModel').value = $('llmModel').value || conversation.llm_model || '';
+    state.conversationOptions.ttsModels = conversation.tts_models || {};
+    state.conversationOptions.ttsVoices = conversation.tts_voices || {};
+    const selectedTtsProvider = populateTtsProviders(
+      conversation.tts_providers || [],
+      conversation.tts_provider || '',
+    );
+    $('ttsModel').value = conversation.tts_model || '';
+    $('ttsVoice').value = conversation.tts_voice || '';
+    updateTtsProviderChoices(
+      selectedTtsProvider !== (conversation.tts_provider || ''),
+    );
+    updateConversationSummary();
+    recordBtn.title = state.sttConfigured
+      ? 'Record voice'
+      : 'Use browser speech recognition';
+    if (state.mode === 'conversation') {
+      statusText.textContent = state.conversationConfigured
+        ? 'Ready for conversation'
+        : 'Conversation service is not configured';
+    }
+    updateStartButton();
+    const prev = localStorage.getItem('talklikeyou_time');
+    if (prev && +prev !== s.start_time) {
+      // Server restarted — start fresh
+      localStorage.removeItem('talklikeyou'); localStorage.removeItem('talklikeyou_time');
+      updateStartButton();
+      return;
+    }
+    localStorage.setItem('talklikeyou_time', s.start_time);
+    try {
+      const raw = localStorage.getItem('talklikeyou');
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (Number.isFinite(+d.faceIdx)) {
+        $('faceIdx').value = String(Math.max(0, Math.round(+d.faceIdx)));
+      }
+      if (Number.isFinite(+d.cropScale) && +d.cropScale > 0) {
+        $('cropScale').value = String(+d.cropScale);
+      }
+      if (typeof d.streamingTts === 'boolean') {
+        $('streamingTts').checked = d.streamingTts;
+      }
+      if (d.srcs) { d.srcs.forEach(s => { state.sources.push({
+        id: s.id, name: s.name, path: s.path, url: s.url, blobUrl: s.url,
+        file: null, avatarId: s.avatarId, registered: !!s.registered,
+        neutralized: !!s.neutralized,
+        isVideo: !!s.isVideo, registrationState: s.registered ? 'registered' : 'idle',
+        registrationProgress: s.registered ? 100 : 0,
+      }); });
+        sourceIdCounter = Math.max(
+          sourceIdCounter,
+          ...state.sources.map(source => +(source.id.match(/^src_(\d+)$/)?.[1] || 0)),
+        );
+        state.activeSourceIds.standard = d.actSrcStandard || null;
+        state.activeSourceIds.video = d.actSrcVideo || null;
+        if (!state.activeSourceIds.standard) {
+          state.activeSourceIds.standard = state.sources.find(
+            source => !isVideoSource(source),
+          )?.id || null;
+        }
+        if (!state.activeSourceIds.video) {
+          state.activeSourceIds.video = state.sources.find(
+            source => isVideoSource(source),
+          )?.id || null;
+        }
+        const restoredActive = state.sources.find(
+          source => source.id === state.activeSourceId,
+        );
+        state.activeSourceName = restoredActive?.name || '—';
+        updateBadges();
+        renderSources(); }
+      if (d.audios?.length) {
+        state.audioFiles = d.audios
+          .filter(audio => audio.path && audio.url)
+          .map(audio => ({ ...audio, file: null }));
+        const explicitlyNoAudio = (
+          Object.prototype.hasOwnProperty.call(d, 'actAud')
+          && d.actAud === null
+        );
+        const cur = explicitlyNoAudio
+          ? null
+          : (
+            state.audioFiles.find(audio => audio.id === d.actAud)
+            || state.audioFiles[state.audioFiles.length - 1]
+          );
+        state.activeAudioId = cur?.id || null;
+        if (cur) { state.audioPath = cur.path; state.audioUrl = cur.url; audioPlayer.src = cur.url; audioPlayer.hidden = false; }
+        renderAudio(); }
+    } catch(e) {}
+  });
+}
+
+function populateDatalist(id, values) {
+  const datalist = $(id);
+  datalist.replaceChildren(...values.map(value => {
+    const option = document.createElement('option');
+    option.value = value;
+    return option;
+  }));
+}
+
+function populateTtsProviders(providers, configuredProvider) {
+  const select = $('ttsProvider');
+  const normalized = providers.map(provider => (
+    typeof provider === 'string'
+      ? { value: provider, label: provider }
+      : provider
+  )).filter(provider => provider?.value);
+  if (!normalized.length && configuredProvider) {
+    normalized.push({ value: configuredProvider, label: configuredProvider });
+  }
+  select.replaceChildren(...normalized.map(provider => {
+    const option = document.createElement('option');
+    option.value = provider.value;
+    option.textContent = provider.label || provider.value;
+    return option;
+  }));
+  if (normalized.some(provider => provider.value === configuredProvider)) {
+    select.value = configuredProvider;
+  }
+  return select.value;
+}
+
+function updateTtsProviderChoices(resetValues = true) {
+  const provider = $('ttsProvider').value;
+  const models = state.conversationOptions.ttsModels[provider] || [];
+  const voices = state.conversationOptions.ttsVoices[provider] || [];
+  populateDatalist('ttsModelOptions', models);
+  const currentVoice = $('ttsVoice').value;
+  const voiceLabels = {
+    'zh-CN-XiaoxiaoNeural': '女声 · 晓晓',
+    'zh-CN-XiaoyiNeural': '女声 · 晓伊',
+    'zh-CN-YunxiNeural': '男声 · 云希',
+    'zh-CN-YunjianNeural': '男声 · 云健',
+  };
+  const normalizedVoices = voices.map(voice => (
+    typeof voice === 'string'
+      ? { value: voice, label: voiceLabels[voice] || voice }
+      : voice
+  ));
+  $('ttsVoice').replaceChildren(...normalizedVoices.map(voice => {
+    const option = document.createElement('option');
+    option.value = voice.value;
+    option.textContent = voice.label || voice.value;
+    return option;
+  }));
+  $('ttsModel').disabled = provider === 'edge';
+  if (resetValues) {
+    $('ttsModel').value = models[0] || '';
+    $('ttsVoice').value = normalizedVoices[0]?.value || '';
+  } else if ([...$('ttsVoice').options].some(option => (
+    option.value === currentVoice
+  ))) {
+    $('ttsVoice').value = currentVoice;
+  }
+  updateConversationSummary();
+}
+
+function updateConversationSummary() {
+  if (!state.conversationConfigured) {
+    conversationModel.textContent = state.conversationConfigured === false
+      ? 'Conversation service is not configured'
+      : 'Conversation service';
+    return;
+  }
+  const model = $('llmModel').value.trim() || 'default model';
+  const provider = $('ttsProvider').selectedOptions[0]?.textContent || 'TTS';
+  conversationModel.textContent = `${model} · ${provider}`;
+}
+
+
+const $ = id => document.getElementById(id);
+const sourceStrip = $('sourceStrip');
+const sourcePoolLabel = $('sourcePoolLabel');
+const sourceInput = $('sourceInput');
+const audioInput = $('audioInput');
+const microphoneInputBtn = $('microphoneInputBtn');
+const audioPlayer = $('audioPlayer');
+const frameImg = $('frame');
+const placeholder = $('placeholder');
+const liveBadge = $('liveBadge');
+const fpsBadge = $('fpsBadge');
+const sourceBadge = $('sourceBadge');
+const startBtn = $('startBtn');
+const stopBtn = $('stopBtn');
+const statusText = $('statusText');
+const audioModeBtn = $('audioModeBtn');
+const videoModeBtn = $('videoModeBtn');
+const conversationModeBtn = $('conversationModeBtn');
+const audioModePanel = $('audioModePanel');
+const conversationPanel = $('conversationPanel');
+const conversationModel = $('conversationModel');
+const chatMessages = $('chatMessages');
+const chatEmpty = $('chatEmpty');
+const chatInput = $('chatInput');
+const sendBtn = $('sendBtn');
+const recordBtn = $('recordBtn');
+const clearChatBtn = $('clearChatBtn');
+const clearAvatarCacheBtn = $('clearAvatarCacheBtn');
+const unloadModelsBtn = $('unloadModelsBtn');
+const shutdownServiceBtn = $('shutdownServiceBtn');
+
+let sourceIdCounter = 0;
+
+function isVideoSource(src) {
+  return !!src.isVideo
+    || /\.(mp4|mov|avi|mkv|webm|m4v)(?:$|[?#])/i.test(src.name || '')
+    || /\.(mp4|mov|avi|mkv|webm|m4v)(?:$|[?#])/i.test(src.path || '');
+}
+
+function visibleSources() {
+  const videoPool = state.mode === 'video';
+  return state.sources.filter(source => isVideoSource(source) === videoPool);
+}
+
+function sourceNeedsNeutralization(src) {
+  const videoDubbing = state.mode === 'video' && isVideoSource(src);
+  return videoDubbing && $('neutral').checked;
+}
+
+function renderSources() {
+  sourceStrip.querySelectorAll('.source-card').forEach(c => c.remove());
+  sourcePoolLabel.textContent = state.mode === 'video'
+    ? 'Video dubbing avatars'
+    : 'Image avatars · Audio & Conversation';
+  visibleSources().forEach(src => {
+    const isVideo = isVideoSource(src);
+    src.isVideo = isVideo;
+    const showNeutralizeAction = state.mode === 'video' && isVideo;
+    const registrationState = src.registrationState || (src.registered ? 'registered' : 'idle');
+    const registering = registrationState === 'queued' || registrationState === 'running';
+    const registerLabel = src.registered
+      ? 'Registered'
+      : (
+        registering
+          ? `${src.registrationProgress || 0}%`
+          : (registrationState === 'failed' ? 'Retry' : 'Register')
+      );
+    const registerClass = src.registered
+      ? ' ready'
+      : (registrationState === 'failed' ? ' failed' : '');
+    const neutralState = src.neutralizationState || (src.neutralized ? 'neutralized' : 'idle');
+    const neutralizing = neutralState === 'queued' || neutralState === 'running';
+    const neutralLabel = src.neutralized
+      ? 'Neutralized'
+      : (neutralizing ? `${src.neutralizationProgress || 0}%` : (neutralState === 'failed' ? 'Retry neutral' : 'Neutralize'));
+    const neutralClass = src.neutralized ? ' ready' : (neutralState === 'failed' ? ' failed' : '');
+    const card = document.createElement('div');
+    card.className = 'source-card' + (src.id === state.activeSourceId ? ' active' : '');
+    card.dataset.id = src.id;
+    card.innerHTML = `
+      <button class="remove" data-action="remove">&times;</button>
+      ${isVideo
+        ? `<video src="${src.blobUrl}" muted playsinline preload="metadata"></video>`
+        : `<img src="${src.blobUrl}" alt="${src.name}">`}
+      ${isVideo ? '<span class="vid-tag">VID</span>' : ''}
+      <div class="avatar-actions${showNeutralizeAction ? '' : ' single'}">
+        <button class="avatar-action${registerClass}" data-action="register" ${registering || src.registered || neutralizing ? 'disabled' : ''}>${registerLabel}</button>
+        ${showNeutralizeAction ? `<button class="avatar-action${neutralClass}" data-action="neutralize" ${!src.registered || registering || neutralizing || src.neutralized ? 'disabled' : ''}>${neutralLabel}</button>` : ''}
+      </div>
+      ${registering || neutralizing ? `<div class="registration-progress"><span style="width:${registering ? (src.registrationProgress || 0) : (src.neutralizationProgress || 0)}%"></span></div>` : ''}
+      <div class="name">${src.name}</div>
+    `;
+    card.addEventListener('click', (e) => {
+      if (e.target.dataset.action === 'remove') { removeSource(src.id); return; }
+      if (e.target.dataset.action === 'register') {
+        e.stopPropagation();
+        registerAvatar(src);
+        return;
+      }
+      if (e.target.dataset.action === 'neutralize') {
+        e.stopPropagation();
+        neutralizeAvatar(src);
+        return;
+      }
+      setActiveSource(src.id);
+    });
+    sourceStrip.appendChild(card);
+  });
+  updateStartButton();
+}
+
+function addSources(files) {
+  const videoPool = state.mode === 'video';
+  let rejected = 0;
+  for (const f of files) {
+    const isVideo = f.type.startsWith('video/')
+      || /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(f.name);
+    if (isVideo !== videoPool) {
+      rejected += 1;
+      continue;
+    }
+    const id = `src_${++sourceIdCounter}`;
+    state.sources.push({
+      id,
+      name: f.name,
+      path: null,
+      url: null,
+      blobUrl: URL.createObjectURL(f),
+      file: f,
+      isVideo,
+      avatarId: null,
+      registered: false,
+      neutralized: false,
+      registrationState: 'idle',
+      registrationProgress: 0,
+    });
+    if (!state.activeSourceId) setActiveSource(id);
+  }
+  renderSources();
+  uploadSources();
+  if (rejected) {
+    statusText.textContent = videoPool
+      ? 'Video dubbing avatar pool accepts video files only'
+      : 'Audio/Conversation avatar pool accepts image files only';
+  }
+}
+
+async function uploadSources() {
+  for (const src of state.sources.filter(s => !s.path)) {
+    const fd = new FormData();
+    const cropSettings = currentAvatarCropSettings();
+    fd.append('file', src.file);
+    fd.append(
+      'max_image_size',
+      String(Math.max(
+        64,
+        Math.min(4096, Math.round(+$('maxImageSize').value || 1024)),
+      )),
+    );
+    fd.append('face_idx', String(cropSettings.faceIdx));
+    fd.append('crop_scale', String(cropSettings.cropScale));
+    try {
+      const r = await fetch('/api/upload/source', { method: 'POST', body: fd });
+      const d = await r.json();
+      src.path = d.path;
+      src.url = d.url;
+      if (src.blobUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(src.blobUrl);
+      }
+      src.blobUrl = d.url;
+      src.avatarId = d.avatar_id;
+      src.isVideo = typeof d.is_video === 'boolean'
+        ? d.is_video
+        : isVideoSource(src);
+      src.registered = !!d.registered && avatarMetadataMatchesCurrentCrop(d);
+      src.neutralized = src.registered && !!d.neutralized;
+      src.registrationState = src.registered ? 'registered' : 'idle';
+      src.registrationProgress = src.registered ? 100 : 0;
+      src.neutralizationState = src.neutralized ? 'neutralized' : 'idle';
+      src.neutralizationProgress = src.neutralized ? 100 : 0;
+      statusText.textContent = d.orientation_normalized
+        ? `Uploaded: ${src.name} · fixed landscape rotation`
+        : `Uploaded: ${src.name}`;
+      renderSources();
+      updateStartButton();
+      saveState();
+    } catch (e) { statusText.textContent = `Upload failed: ${src.name}`; }
+  }
+}
+
+function removeSource(id) {
+  const idx = state.sources.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  const src = state.sources[idx];
+  if (src.blobUrl) URL.revokeObjectURL(src.blobUrl);
+  state.sources.splice(idx, 1);
+  if (state.activeSourceId === id) {
+    state.activeSourceId = visibleSources()[0]?.id || null;
+  }
+  renderSources(); updateBadges();}
+
+function setActiveSource(id) {
+  const src = state.sources.find(s => s.id === id);
+  if (!src) return;
+  const current = state.sources.find(s => s.id === state.activeSourceId);
+  if (
+    state.ws
+    && state.ws.readyState === WebSocket.OPEN
+    && current
+    && current.isVideo !== src.isVideo
+  ) {
+    statusText.textContent = 'Stop before switching between image and video sources';
+    return;
+  }
+  if (state.ws && state.ws.readyState === WebSocket.OPEN && !src.registered) {
+    statusText.textContent = `Register ${src.name} before switching`;
+    return;
+  }
+  if (
+    state.ws
+    && state.ws.readyState === WebSocket.OPEN
+    && sourceNeedsNeutralization(src)
+    && !src.neutralized
+  ) {
+    statusText.textContent = `Neutralize ${src.name} before switching`;
+    return;
+  }
+  state.activeSourceId = id;
+  state.activeSourceName = src.name;
+  renderSources();
+  updateBadges();
+  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+    if (src.avatarId) {
+      state.ws.send(JSON.stringify({
+        action: 'switch',
+        source: src.avatarId,
+        source_name: src.name,
+        frame: currentPlaybackTimelineFrame(),
+      }));
+      statusText.textContent = `Switching → ${src.name}`;
+    }
+  }
+  saveState();
+}
+
+async function registerAvatar(src) {
+  if (!src.path || !src.avatarId) return;
+  const cropSettings = currentAvatarCropSettings();
+  src.registered = false;
+  src.registrationState = 'queued';
+  src.registrationProgress = 0;
+  src.registrationMessage = 'Waiting for GPU';
+  renderSources();
+  updateStartButton();
+  statusText.textContent = `Registering ${src.name} · waiting for GPU`;
+  try {
+    const response = await fetch('/api/avatar/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        avatar_id: src.avatarId,
+        source_path: src.path,
+        source_name: src.name,
+        prepare_per_frame_normalize_delta: (
+          state.mode === 'video'
+          && $('stage0').checked
+          && !$('neutral').checked
+          && $('perFrameNormalizeDelta').checked
+        ),
+        face_idx: cropSettings.faceIdx,
+        crop_scale: cropSettings.cropScale,
+      }),
+    });
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.detail || 'Registration failed');
+    if (!job.job_id) {
+      finishAvatarRegistration(src, job);
+      return;
+    }
+    await pollAvatarJob(src, job.job_id, 'registration');
+  } catch (error) {
+    src.registrationState = 'failed';
+    src.registrationMessage = error.message;
+    src.registered = false;
+    renderSources();
+    updateStartButton();
+    statusText.textContent = `Registration failed: ${error.message}`;
+  }
+}
+
+async function pollAvatarJob(src, jobId, kind) {
+  while (true) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = await fetch(`/api/avatar/register/${jobId}`);
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.detail || 'Registration status failed');
+    const neutralizing = kind === 'neutralization';
+    src[neutralizing ? 'neutralizationState' : 'registrationState'] = job.status;
+    src[neutralizing ? 'neutralizationProgress' : 'registrationProgress'] = job.progress || 0;
+    renderSources();
+    statusText.textContent = `${neutralizing ? 'Neutralizing' : 'Registering'} ${src.name} · ${job.message} · ${job.progress || 0}%`;
+    if (job.status === 'completed') {
+      if (neutralizing) finishAvatarNeutralization(src, job);
+      else finishAvatarRegistration(src, job);
+      return;
+    }
+    if (job.status === 'failed' || job.status === 'cancelled') {
+      throw new Error(job.error || job.message || 'Registration failed');
+    }
+  }
+}
+
+function finishAvatarRegistration(src, job) {
+  if (!avatarMetadataMatchesCurrentCrop(job.avatar)) {
+    src.registered = false;
+    src.neutralized = false;
+    src.registrationState = 'idle';
+    src.registrationProgress = 0;
+    src.neutralizationState = 'idle';
+    src.neutralizationProgress = 0;
+    renderSources();
+    updateStartButton();
+    saveState();
+    statusText.textContent = `${src.name} finished with old face/crop settings; register again`;
+    return;
+  }
+  src.registered = true;
+  src.neutralized = !!job.avatar?.neutralized;
+  src.registrationState = 'registered';
+  src.registrationProgress = 100;
+  renderSources();
+  updateStartButton();
+  saveState();
+  statusText.textContent = `${src.name} registered`;
+}
+
+async function neutralizeAvatar(src) {
+  if (!src.registered || !src.avatarId) return;
+  src.neutralized = false;
+  src.neutralizationState = 'queued';
+  src.neutralizationProgress = 0;
+  renderSources();
+  statusText.textContent = `Neutralizing ${src.name} · waiting for GPU`;
+  try {
+    const response = await fetch('/api/avatar/neutralize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        avatar_id: src.avatarId,
+      }),
+    });
+    const job = await response.json();
+    if (!response.ok) throw new Error(job.detail || 'Neutralization failed');
+    if (!job.job_id) finishAvatarNeutralization(src, job);
+    else await pollAvatarJob(src, job.job_id, 'neutralization');
+  } catch (error) {
+    src.neutralizationState = 'failed';
+    src.neutralized = false;
+    renderSources();
+    statusText.textContent = `Neutralization failed: ${error.message}`;
+  }
+}
+
+function finishAvatarNeutralization(src, job) {
+  if (!avatarMetadataMatchesCurrentCrop(job.avatar)) {
+    src.registered = false;
+    src.neutralized = false;
+    src.registrationState = 'idle';
+    src.registrationProgress = 0;
+    src.neutralizationState = 'idle';
+    src.neutralizationProgress = 0;
+    renderSources();
+    updateStartButton();
+    saveState();
+    statusText.textContent = `${src.name} finished with old face/crop settings; register again`;
+    return;
+  }
+  src.neutralized = true;
+  src.neutralizationState = 'neutralized';
+  src.neutralizationProgress = 100;
+  renderSources();
+  updateStartButton();
+  saveState();
+  statusText.textContent = `${src.name} neutralized`;
+}
+
+function currentAvatarCropSettings() {
+  const faceIdx = Math.max(0, Math.round(+$('faceIdx').value || 0));
+  const rawCropScale = +$('cropScale').value;
+  const cropScale = Number.isFinite(rawCropScale) && rawCropScale > 0
+    ? rawCropScale
+    : 2.3;
+  $('faceIdx').value = String(faceIdx);
+  $('cropScale').value = String(cropScale);
+  return { faceIdx, cropScale };
+}
+
+function avatarMetadataMatchesCurrentCrop(metadata) {
+  if (!metadata) return true;
+  const current = currentAvatarCropSettings();
+  return (
+    +(metadata.face_idx ?? 0) === current.faceIdx
+    && Math.abs(+(metadata.crop_scale ?? 2.3) - current.cropScale) < 1e-6
+  );
+}
+
+function invalidateAvatarRegistrations(reason, includeVideo = false) {
+  state.sources.forEach(src => {
+    src.neutralized = false;
+    const neutralizing = (
+      src.neutralizationState === 'queued'
+      || src.neutralizationState === 'running'
+    );
+    if (!neutralizing) {
+      src.neutralizationState = 'idle';
+      src.neutralizationProgress = 0;
+    }
+    if (includeVideo || !src.isVideo) {
+      src.registered = false;
+      const registering = (
+        src.registrationState === 'queued'
+        || src.registrationState === 'running'
+      );
+      if (!registering) {
+        src.registrationState = 'idle';
+        src.registrationProgress = 0;
+      }
+    }
+  });
+  if (reason) statusText.textContent = reason;
+  renderSources();
+  updateStartButton();
+  saveState();
+}
+
+clearAvatarCacheBtn.addEventListener('click', async () => {
+  const confirmed = window.confirm(
+    'Clear all registered avatar caches? Uploaded files will be kept.',
+  );
+  if (!confirmed) return;
+
+  state.clearingAvatarCache = true;
+  statusText.textContent = 'Clearing avatar cache...';
+  updateStartButton();
+  try {
+    const response = await fetch('/api/avatar/registrations', {
+      method: 'DELETE',
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Unable to clear cache');
+    state.sources.forEach(src => {
+      src.registered = false;
+      src.neutralized = false;
+      src.registrationState = 'idle';
+      src.registrationProgress = 0;
+      src.neutralizationState = 'idle';
+      src.neutralizationProgress = 0;
+      src.registrationMessage = 'Cache cleared';
+    });
+    renderSources();
+    saveState();
+    statusText.textContent = `Avatar cache cleared · ${result.removed || 0} removed`;
+  } catch (error) {
+    statusText.textContent = `Clear cache failed: ${error.message}`;
+  } finally {
+    state.clearingAvatarCache = false;
+    updateStartButton();
+  }
+});
+
+unloadModelsBtn.addEventListener('click', async () => {
+  state.systemBusy = true;
+  statusText.textContent = 'Releasing GPU models...';
+  updateStartButton();
+  try {
+    const response = await fetch('/api/system/unload', { method: 'POST' });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.detail || 'Unable to release GPU memory');
+    }
+    state.modelsLoaded = false;
+    statusText.textContent = result.message
+      || 'GPU models released · next inference will reload them';
+  } catch (error) {
+    statusText.textContent = `Release VRAM failed: ${error.message}`;
+  } finally {
+    state.systemBusy = false;
+    updateStartButton();
+  }
+});
+
+shutdownServiceBtn.addEventListener('click', async () => {
+  const confirmed = window.confirm(
+    'Exit the service? All active browser sessions will disconnect.',
+  );
+  if (!confirmed) return;
+  state.systemBusy = true;
+  statusText.textContent = 'Stopping service...';
+  updateStartButton();
+  try {
+    const response = await fetch('/api/system/shutdown', { method: 'POST' });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.detail || 'Unable to stop the service');
+    }
+    state.serviceStopping = true;
+    statusText.textContent = 'Service is shutting down';
+    document.querySelectorAll('button, input, textarea, select').forEach(
+      control => { control.disabled = true; },
+    );
+  } catch (error) {
+    state.systemBusy = false;
+    statusText.textContent = `Exit service failed: ${error.message}`;
+    updateStartButton();
+  }
+});
+
+sourceInput.addEventListener('change', () => {
+  if (sourceInput.files.length) { addSources(sourceInput.files); sourceInput.value = ''; }
+});
+sourceStrip.addEventListener('dragover', e => { e.preventDefault(); });
+sourceStrip.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) addSources(e.dataTransfer.files);
+});
+
+const audioStrip = $('audioStrip');
+state.audioFiles = [];
+state.activeAudioId = null;
+
+function renderAudio() {
+  document.querySelectorAll('.audio-card[data-id]').forEach(c => c.remove());
+  microphoneInputBtn.classList.toggle('active', state.microphoneSelected);
+  microphoneInputBtn.classList.toggle('live', state.microphoneStreaming);
+  state.audioFiles.forEach(a => {
+    const card = document.createElement('div');
+    card.className = 'audio-card' + (a.id === state.activeAudioId ? ' active' : '');
+    card.dataset.id = a.id;
+    card.innerHTML = `
+      <button class="remove" data-action="remove">&times;</button>
+      <div class="name">${a.name}</div>
+      <div class="size">${a.error ? 'Failed' : (a.path ? 'Ready' : 'Uploading...')}</div>
+      <button class="send-chunk" data-action="send-chunk" type="button">
+        Send to chunk
+      </button>
+    `;
+    card.addEventListener('click', (e) => {
+      if (e.target.dataset.action === 'remove') { removeAudio(a.id); return; }
+      if (e.target.dataset.action === 'send-chunk') {
+        e.stopPropagation();
+        sendAudioToChunk(a.id);
+        return;
+      }
+      state.microphoneSelected = false;
+      state.activeAudioId = a.id; state.audioPath = a.path; state.audioUrl = a.url;
+      if (a.url && !state.streaming) {
+        audioPlayer.src = a.url;
+        audioPlayer.hidden = false;
+      }
+      renderAudio(); updateMotionControlState(); updateStartButton(); saveState();
+    });
+    audioStrip.appendChild(card);
+  });
+  updateStartButton();
+}
+
+function removeAudio(id) {
+  state.audioFiles = state.audioFiles.filter(a => a.id !== id);
+  if (state.activeAudioId === id) {
+    const a = state.audioFiles[state.audioFiles.length - 1];
+    state.activeAudioId = a?.id || null;
+    state.audioPath = a?.path || null; state.audioUrl = a?.url || null;
+    if (!state.streaming) {
+      if (a?.url) {
+        audioPlayer.src = a.url;
+        audioPlayer.hidden = false;
+      } else {
+        audioPlayer.removeAttribute('src');
+        audioPlayer.load();
+        audioPlayer.hidden = true;
+      }
+    }
+  }
+  renderAudio(); saveState();
+}
+
+function uploadAudioFile(file) {
+  if (!file.type.startsWith('audio/') && !file.name.match(/\.(wav|mp3|m4a|ogg|flac|aac)$/i)) {
+    statusText.textContent = 'Not an audio file: ' + file.name; return;
+  }
+  const suffix = crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const id = `audio_${suffix}`;
+  state.audioFiles.push({
+    id,
+    name: file.name,
+    path: null,
+    url: null,
+    file,
+    error: false,
+  });
+  state.activeAudioId = id;
+  state.microphoneSelected = false;
+  state.audioPath = null;
+  state.audioUrl = null;
+  if (!state.streaming) {
+    audioPlayer.pause();
+    audioPlayer.removeAttribute('src');
+    audioPlayer.load();
+  }
+  renderAudio();
+  updateMotionControlState();
+  const fd = new FormData(); fd.append('file', file);
+  fetch('/api/upload/audio', { method: 'POST', body: fd }).then(r => r.json()).then(data => {
+    const a = state.audioFiles.find(a => a.id === id);
+    if (a) { a.path = data.path; a.url = data.url; }
+    if (state.activeAudioId === id) {
+      state.audioPath = data.path; state.audioUrl = data.url;
+      if (!state.streaming) {
+        audioPlayer.src = data.url;
+        audioPlayer.hidden = false;
+      }
+    }
+    renderAudio(); updateStartButton(); saveState();
+  }).catch(() => {
+    const audio = state.audioFiles.find(item => item.id === id);
+    if (audio) audio.error = true;
+    renderAudio();
+    statusText.textContent = `Audio upload failed: ${file.name}`;
+  });
+}
+
+audioInput.addEventListener('change', () => {
+  Array.from(audioInput.files).forEach(uploadAudioFile);
+  audioInput.value = '';
+});
+
+microphoneInputBtn.addEventListener('click', () => {
+  if (state.mode !== 'audio' || state.streaming) return;
+  state.microphoneSelected = true;
+  state.activeAudioId = null;
+  state.audioPath = null;
+  state.audioUrl = null;
+  audioPlayer.pause();
+  audioPlayer.removeAttribute('src');
+  audioPlayer.load();
+  audioPlayer.hidden = true;
+  statusText.textContent = 'Live microphone selected · click Start Microphone';
+  renderAudio();
+  updateMotionControlState();
+  saveState();
+});
+
+let totalExpectedFrames = 0;
+const MOTION_FPS = 25;
+let streamTimelineFps = MOTION_FPS;
+let playbackBufferFrames = 75;
+let frameBuffer = new Map();
+let receivedFrameCount = 0;
+let streamRenderFps = MOTION_FPS;
+let displayRaf = null;
+let streamDone = false;
+let audioStarted = false;
+let showFrameIdx = -1;
+let continuousIdle = false;
+let streamHasAudio = false;
+let streamUsesMicrophone = false;
+let streamUsesConversationTts = false;
+let idleClockStartedAt = null;
+let idleClockStartFrame = 0;
+const NETWORK_STALL_GRACE_MS = 120;
+const NETWORK_REBUFFER_SECONDS = 12 / MOTION_FPS;
+let networkRebuffering = false;
+let missingVideoFrameSince = null;
+let lastReportedPlayhead = -1;
+let liveMicrophoneCapture = null;
+let liveMicrophonePlayback = null;
+const LIVE_MIC_SAMPLE_RATE = 16000;
+const LIVE_MIC_PACKET_SAMPLES = 1600;
+const LIVE_MIC_MAX_SOCKET_BYTES = 256 * 1024;
+const LIVE_MIC_MAX_MONITOR_DELAY = 60;
+let conversationTtsAudio = null;
+
+async function prepareConversationTtsAudio() {
+  stopConversationTtsAudio();
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    throw new Error('This browser does not support streaming conversation audio');
+  }
+  const context = new AudioContextClass({ latencyHint: 'interactive' });
+  const gain = context.createGain();
+  gain.connect(context.destination);
+  await context.resume();
+  conversationTtsAudio = {
+    context,
+    gain,
+    pending: [],
+    started: false,
+    startedAt: null,
+    nextStartTime: null,
+    scheduledEnd: null,
+    suspendedForBuffering: false,
+  };
+}
+
+function stopConversationTtsAudio() {
+  const audio = conversationTtsAudio;
+  conversationTtsAudio = null;
+  if (!audio) return;
+  try { audio.gain.disconnect(); } catch (error) {}
+  audio.context.close().catch(() => {});
+}
+
+function scheduleConversationTtsBuffer(buffer) {
+  const audio = conversationTtsAudio;
+  if (!audio?.started) {
+    audio?.pending.push(buffer);
+    return;
+  }
+  const source = audio.context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audio.gain);
+  const startAt = Math.max(
+    audio.nextStartTime ?? (audio.context.currentTime + 0.05),
+    audio.context.currentTime + 0.03,
+  );
+  source.start(startAt);
+  if (audio.startedAt === null) audio.startedAt = startAt;
+  audio.nextStartTime = startAt + buffer.duration;
+  audio.scheduledEnd = audio.nextStartTime;
+}
+
+function enqueueConversationTtsPcm(pcmBytes) {
+  const audio = conversationTtsAudio;
+  if (!audio || pcmBytes.byteLength < 2) return;
+  const sampleCount = Math.floor(pcmBytes.byteLength / 2);
+  const view = new DataView(
+    pcmBytes.buffer,
+    pcmBytes.byteOffset,
+    sampleCount * 2,
+  );
+  const buffer = audio.context.createBuffer(
+    1,
+    sampleCount,
+    LIVE_MIC_SAMPLE_RATE,
+  );
+  const channel = buffer.getChannelData(0);
+  for (let index = 0; index < sampleCount; index += 1) {
+    channel[index] = view.getInt16(index * 2, true) / 32768;
+  }
+  scheduleConversationTtsBuffer(buffer);
+}
+
+function startConversationTtsPlayback() {
+  const audio = conversationTtsAudio;
+  if (!audio || audio.started) return;
+  audio.started = true;
+  const pending = audio.pending.splice(0);
+  pending.forEach(scheduleConversationTtsBuffer);
+}
+
+function conversationTtsPlayheadSeconds() {
+  const audio = conversationTtsAudio;
+  if (!audio?.started || audio.startedAt === null) return 0;
+  const elapsed = Math.max(0, audio.context.currentTime - audio.startedAt);
+  if (audio.scheduledEnd === null) return elapsed;
+  return Math.min(elapsed, audio.scheduledEnd - audio.startedAt);
+}
+
+function conversationTtsPlaybackEnded() {
+  const audio = conversationTtsAudio;
+  return !!(
+    audio?.started
+    && audio.scheduledEnd !== null
+    && audio.context.currentTime >= audio.scheduledEnd - 0.01
+  );
+}
+
+function pauseConversationTtsForBuffering() {
+  const audio = conversationTtsAudio;
+  if (!audio || audio.suspendedForBuffering) return;
+  audio.suspendedForBuffering = true;
+  audio.context.suspend().catch(() => {});
+}
+
+function resumeConversationTtsAfterBuffering() {
+  const audio = conversationTtsAudio;
+  if (!audio || !audio.suspendedForBuffering) return;
+  audio.suspendedForBuffering = false;
+  audio.context.resume().catch(() => {});
+}
+
+function pushLiveMicrophoneSamples(inputSamples) {
+  const capture = liveMicrophoneCapture;
+  if (!capture?.active || !inputSamples.length) return;
+
+  const merged = new Float32Array(
+    capture.resampleCarry.length + inputSamples.length,
+  );
+  merged.set(capture.resampleCarry);
+  merged.set(inputSamples, capture.resampleCarry.length);
+
+  const ratio = capture.audioContext.sampleRate / LIVE_MIC_SAMPLE_RATE;
+  let position = capture.resamplePosition;
+  const output = [];
+  while (position + 1 < merged.length) {
+    const index = Math.floor(position);
+    const fraction = position - index;
+    output.push(
+      merged[index]
+      + (merged[index + 1] - merged[index]) * fraction,
+    );
+    position += ratio;
+  }
+
+  const consumed = Math.min(
+    Math.floor(position),
+    Math.max(0, merged.length - 1),
+  );
+  capture.resampleCarry = merged.slice(consumed);
+  capture.resamplePosition = position - consumed;
+  if (!output.length) return;
+
+  const combined = new Float32Array(
+    capture.packetBuffer.length + output.length,
+  );
+  combined.set(capture.packetBuffer);
+  combined.set(output, capture.packetBuffer.length);
+  let offset = 0;
+  while (combined.length - offset >= LIVE_MIC_PACKET_SAMPLES) {
+    const packet = combined.slice(
+      offset,
+      offset + LIVE_MIC_PACKET_SAMPLES,
+    );
+    const socket = capture.socket;
+    if (
+      socket?.readyState === WebSocket.OPEN
+      && socket.bufferedAmount <= LIVE_MIC_MAX_SOCKET_BYTES
+    ) {
+      socket.send(packet.buffer);
+    }
+    offset += LIVE_MIC_PACKET_SAMPLES;
+  }
+  capture.packetBuffer = combined.slice(offset);
+}
+
+async function prepareLiveMicrophone() {
+  stopLiveMicrophone(false);
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('This browser does not support microphone capture');
+  }
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    throw new Error('This browser does not support Web Audio');
+  }
+
+  const mediaStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  });
+  try {
+    const audioContext = new AudioContextClass({ latencyHint: 'interactive' });
+    await audioContext.resume();
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    const silentGain = audioContext.createGain();
+    const monitorDelay = audioContext.createDelay(
+      LIVE_MIC_MAX_MONITOR_DELAY,
+    );
+    const monitorGain = audioContext.createGain();
+    silentGain.gain.value = 0;
+    monitorDelay.delayTime.value = LIVE_MIC_MAX_MONITOR_DELAY;
+    monitorGain.gain.value = $('microphonePlayback').checked ? 1 : 0;
+    liveMicrophoneCapture = {
+      mediaStream,
+      audioContext,
+      source,
+      processor,
+      silentGain,
+      monitorDelay,
+      monitorGain,
+      socket: null,
+      active: false,
+      activatedAt: null,
+      monitorConnected: false,
+      monitorStarted: false,
+      resampleCarry: new Float32Array(0),
+      resamplePosition: 0,
+      packetBuffer: new Float32Array(0),
+    };
+    processor.onaudioprocess = event => {
+      event.outputBuffer.getChannelData(0).fill(0);
+      pushLiveMicrophoneSamples(event.inputBuffer.getChannelData(0));
+    };
+    source.connect(processor);
+    processor.connect(silentGain);
+    silentGain.connect(audioContext.destination);
+    monitorDelay.connect(monitorGain);
+    monitorGain.connect(audioContext.destination);
+  } catch (error) {
+    mediaStream.getTracks().forEach(track => track.stop());
+    throw error;
+  }
+}
+
+function activateLiveMicrophone(socket) {
+  if (!liveMicrophoneCapture) return;
+  liveMicrophoneCapture.socket = socket;
+  liveMicrophoneCapture.active = true;
+  liveMicrophoneCapture.activatedAt = performance.now();
+  if (!liveMicrophoneCapture.monitorConnected) {
+    liveMicrophoneCapture.source.connect(
+      liveMicrophoneCapture.monitorDelay,
+    );
+    liveMicrophoneCapture.monitorConnected = true;
+  }
+  state.microphoneStreaming = true;
+  renderAudio();
+}
+
+function startLiveMicrophonePlayback() {
+  const capture = liveMicrophoneCapture || liveMicrophonePlayback;
+  if (
+    !capture?.monitorConnected
+    || capture.monitorStarted
+    || capture.activatedAt === null
+  ) {
+    return;
+  }
+  const measuredDelay = (
+    performance.now() - capture.activatedAt
+  ) / 1000;
+  const playbackDelay = Math.max(
+    0.05,
+    Math.min(LIVE_MIC_MAX_MONITOR_DELAY - 0.1, measuredDelay),
+  );
+  capture.monitorDelay.delayTime.cancelScheduledValues(
+    capture.audioContext.currentTime,
+  );
+  capture.monitorDelay.delayTime.setValueAtTime(
+    playbackDelay,
+    capture.audioContext.currentTime,
+  );
+  capture.monitorStarted = true;
+}
+
+function updateLiveMicrophonePlaybackGain() {
+  const enabled = $('microphonePlayback').checked;
+  [liveMicrophoneCapture, liveMicrophonePlayback].forEach(capture => {
+    if (!capture) return;
+    capture.monitorGain.gain.setTargetAtTime(
+      enabled ? 1 : 0,
+      capture.audioContext.currentTime,
+      0.01,
+    );
+  });
+}
+
+function closeLiveMicrophoneGraph(capture) {
+  if (!capture) return;
+  capture.processor.onaudioprocess = null;
+  try { capture.source.disconnect(); } catch (error) {}
+  try { capture.processor.disconnect(); } catch (error) {}
+  try { capture.silentGain.disconnect(); } catch (error) {}
+  try { capture.monitorDelay.disconnect(); } catch (error) {}
+  try { capture.monitorGain.disconnect(); } catch (error) {}
+  capture.mediaStream.getTracks().forEach(track => track.stop());
+  capture.audioContext.close().catch(() => {});
+}
+
+function stopLiveMicrophone(sendFinal) {
+  const capture = liveMicrophoneCapture;
+  liveMicrophoneCapture = null;
+  state.microphoneStreaming = false;
+  if (capture) {
+    capture.active = false;
+    if (sendFinal && capture.socket?.readyState === WebSocket.OPEN) {
+      if (capture.packetBuffer.length) {
+        capture.socket.send(capture.packetBuffer.slice().buffer);
+      }
+      capture.socket.send(JSON.stringify({ action: 'mic_stop' }));
+    }
+    capture.processor.onaudioprocess = null;
+    try { capture.source.disconnect(capture.processor); } catch (error) {}
+    try { capture.processor.disconnect(); } catch (error) {}
+    try { capture.silentGain.disconnect(); } catch (error) {}
+    capture.mediaStream.getTracks().forEach(track => track.stop());
+    if (sendFinal && capture.monitorConnected) {
+      closeLiveMicrophoneGraph(liveMicrophonePlayback);
+      liveMicrophonePlayback = capture;
+    } else {
+      closeLiveMicrophoneGraph(capture);
+    }
+  }
+  if (!sendFinal && liveMicrophonePlayback) {
+    closeLiveMicrophoneGraph(liveMicrophonePlayback);
+    liveMicrophonePlayback = null;
+  }
+  if (capture) renderAudio();
+}
+
+function rebufferTargetFrames(targetFrame) {
+  const targetBufferFrames = Math.max(
+    1,
+    Math.round(NETWORK_REBUFFER_SECONDS * streamTimelineFps),
+  );
+  if (totalExpectedFrames <= 0) return targetBufferFrames;
+  return Math.max(
+    1,
+    Math.min(targetBufferFrames, totalExpectedFrames - targetFrame),
+  );
+}
+
+function bufferedFrameAtOrBefore(targetFrame) {
+  let candidate = Math.min(targetFrame, state.frameCount - 1);
+  const lookbackFrames = Math.max(
+    1,
+    Math.round(0.16 * streamTimelineFps),
+  );
+  const oldestUseful = Math.max(
+    showFrameIdx + 1,
+    candidate - lookbackFrames,
+  );
+  while (candidate >= oldestUseful) {
+    if (frameBuffer.has(candidate)) return candidate;
+    candidate -= 1;
+  }
+  return null;
+}
+
+function showBufferedFrame(frameIndex) {
+  const blob = frameBuffer.get(frameIndex);
+  if (!blob) return false;
+  if (frameIndex === showFrameIdx) return true;
+  showFrameIdx = frameIndex;
+  const url = URL.createObjectURL(blob);
+  const old = frameImg.src;
+  frameImg.src = url;
+  if (old?.startsWith('blob:')) URL.revokeObjectURL(old);
+  return true;
+}
+
+function currentPlaybackTimelineFrame() {
+  if (streamUsesConversationTts) {
+    return Math.max(
+      0,
+      Math.floor(conversationTtsPlayheadSeconds() * streamTimelineFps),
+    );
+  }
+  if (audioStarted && streamHasAudio && !audioPlayer.ended) {
+    return Math.max(
+      0,
+      Math.floor(audioPlayer.currentTime * streamTimelineFps),
+    );
+  }
+  return Math.max(0, showFrameIdx);
+}
+
+function reportPlayhead(frameIndex, force = false) {
+  const normalizedFrame = Math.max(0, Math.floor(frameIndex));
+  if (!force && normalizedFrame <= lastReportedPlayhead) return;
+  if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+  lastReportedPlayhead = normalizedFrame;
+  state.ws.send(JSON.stringify({
+    action: 'playhead',
+    frame: normalizedFrame,
+  }));
+}
+
+function conversationStreamIsReusable() {
+  return state.mode === 'conversation' && currentStreamCanBeReplaced();
+}
+
+function audioStreamIsReusable() {
+  return (
+    (state.mode === 'audio' || state.mode === 'video')
+    && currentStreamCanBeReplaced()
+  );
+}
+
+function currentStreamCanBeReplaced() {
+  const socketActive = state.ws && (
+    state.ws.readyState === WebSocket.CONNECTING
+    || state.ws.readyState === WebSocket.OPEN
+  );
+  return (
+    state.streaming
+    && (streamDone || (continuousIdle && socketActive))
+  );
+}
+
+function updateStartButton() {
+  const activeSrc = state.sources.find(s => s.id === state.activeSourceId);
+  const needsNeutralAssets = (
+    activeSrc ? sourceNeedsNeutralization(activeSrc) : false
+  );
+  const hasSrc = !!(
+    activeSrc?.path
+    && activeSrc?.avatarId
+    && activeSrc.registered
+    && (!needsNeutralAssets || activeSrc.neutralized)
+  );
+  const sourceIsVideo = activeSrc ? isVideoSource(activeSrc) : false;
+  const hasAud = state.activeAudioId && state.audioPath;
+  const liveMicrophone = (
+    state.mode === 'audio' && state.microphoneSelected
+  );
+  const idleEnabled = $('continuousIdle').checked;
+  const reusableConversationStream = conversationStreamIsReusable();
+  const reusableAudioStream = audioStreamIsReusable();
+  const avatarRegistrationBusy = state.sources.some(source => (
+    source.registrationState === 'queued'
+    || source.registrationState === 'running'
+    || source.neutralizationState === 'queued'
+    || source.neutralizationState === 'running'
+  ));
+  startBtn.disabled = (
+    !(
+      (
+        state.mode === 'audio'
+        && hasSrc
+        && !sourceIsVideo
+        && (hasAud || liveMicrophone || idleEnabled)
+      )
+      || (state.mode === 'video' && hasSrc && sourceIsVideo)
+    )
+    || state.streaming
+    || state.systemBusy
+    || state.serviceStopping
+  );
+  startBtn.textContent = liveMicrophone
+    ? 'Start Microphone'
+    : 'Start Streaming';
+  microphoneInputBtn.disabled = (
+    state.mode !== 'audio'
+    || state.streaming
+    || state.systemBusy
+    || state.serviceStopping
+  );
+  document.querySelectorAll('.audio-card .send-chunk').forEach(button => {
+    const card = button.closest('.audio-card');
+    const audio = state.audioFiles.find(item => item.id === card?.dataset.id);
+    const validMediaMode = (
+      (state.mode === 'audio' && !sourceIsVideo)
+      || (state.mode === 'video' && sourceIsVideo)
+    );
+    button.disabled = (
+      !validMediaMode
+      || !hasSrc
+      || !audio?.path
+      || (state.streaming && !reusableAudioStream)
+    );
+  });
+  sendBtn.disabled = (
+    state.mode !== 'conversation'
+    || !hasSrc
+    || !state.conversationConfigured
+    || state.conversationBusy
+    || (state.streaming && !reusableConversationStream)
+    || !chatInput.value.trim()
+  );
+  recordBtn.disabled = (
+    state.mode !== 'conversation'
+    || !hasSrc
+    || (!state.sttConfigured && !('SpeechRecognition' in window || 'webkitSpeechRecognition' in window))
+    || state.conversationBusy
+    || (state.streaming && !reusableConversationStream)
+  );
+  stopBtn.disabled = (
+    !(state.streaming || state.conversationBusy)
+    || state.microphoneFinishing
+  );
+  audioModeBtn.disabled = state.streaming || state.conversationBusy || state.systemBusy;
+  videoModeBtn.disabled = state.streaming || state.conversationBusy || state.systemBusy;
+  conversationModeBtn.disabled = state.streaming || state.conversationBusy || state.systemBusy;
+  clearAvatarCacheBtn.disabled = (
+    state.streaming
+    || state.conversationBusy
+    || state.clearingAvatarCache
+    || avatarRegistrationBusy
+  );
+  unloadModelsBtn.disabled = (
+    state.streaming
+    || state.conversationBusy
+    || state.systemBusy
+    || state.serviceStopping
+    || avatarRegistrationBusy
+  );
+  shutdownServiceBtn.disabled = (
+    state.streaming
+    || state.conversationBusy
+    || state.systemBusy
+    || state.serviceStopping
+    || avatarRegistrationBusy
+  );
+}
+function updateBadges() { sourceBadge.textContent = state.activeSourceName || '—'; }
+
+function setMode(mode) {
+  if (state.streaming || state.conversationBusy) {
+    statusText.textContent = 'Stop the current turn before changing mode';
+    return;
+  }
+  state.mode = mode;
+  const conversationMode = mode === 'conversation';
+  const videoMode = mode === 'video';
+  sourceInput.accept = videoMode ? 'video/*' : 'image/*';
+  sourceInput.closest('.add-source').title = videoMode
+    ? 'Add video dubbing avatars'
+    : 'Add image avatars';
+  audioModeBtn.classList.toggle('active', mode === 'audio');
+  videoModeBtn.classList.toggle('active', videoMode);
+  conversationModeBtn.classList.toggle('active', conversationMode);
+  audioModePanel.hidden = conversationMode;
+  microphoneInputBtn.hidden = mode !== 'audio';
+  conversationPanel.hidden = !conversationMode;
+  startBtn.hidden = conversationMode;
+  placeholder.querySelector('.text').textContent = (
+    conversationMode
+      ? 'Choose a source, then start a conversation'
+      : (
+        videoMode
+          ? 'Choose a registered video, then Start'
+          : 'Ready — add sources & audio, then Start'
+      )
+  );
+  if (conversationMode) {
+    statusText.textContent = state.conversationConfigured
+      ? 'Ready for conversation'
+      : 'Conversation service is not configured';
+  } else {
+    statusText.textContent = videoMode
+      ? 'Ready for video dubbing'
+      : 'Ready for audio';
+  }
+  updateMotionControlState();
+  const activeSource = state.sources.find(
+    source => source.id === state.activeSourceId,
+  );
+  state.activeSourceName = activeSource?.name || '—';
+  updateBadges();
+  renderSources();
+  renderAudio();
+  localStorage.setItem('talklikeyou_input_mode', mode);
+  updateStartButton();
+}
+
+audioModeBtn.addEventListener('click', () => setMode('audio'));
+videoModeBtn.addEventListener('click', () => setMode('video'));
+conversationModeBtn.addEventListener('click', () => setMode('conversation'));
+chatInput.addEventListener('input', updateStartButton);
+
+function displayLoop() {
+  if (!audioStarted) {
+    const estimatedTotal = totalExpectedFrames || playbackBufferFrames;
+    const requiredFrames = streamDone
+      ? Math.max(1, Math.min(playbackBufferFrames, state.frameCount))
+      : Math.max(1, Math.min(playbackBufferFrames, estimatedTotal));
+    const bufferedFrames = Math.min(requiredFrames, state.frameCount);
+    if (bufferedFrames >= requiredFrames) {
+      if (streamHasAudio) {
+        audioPlayer.src = state.audioUrl;
+        audioPlayer.currentTime = 0;
+        networkRebuffering = false;
+        audioPlayer.play().catch(() => {});
+      } else if (streamUsesConversationTts) {
+        networkRebuffering = false;
+        startConversationTtsPlayback();
+      } else {
+        idleClockStartedAt = performance.now();
+        idleClockStartFrame = 0;
+      }
+      audioStarted = true;
+      if (streamUsesMicrophone) {
+        startLiveMicrophonePlayback();
+      }
+      placeholder.style.display = 'none'; frameImg.style.display = 'block';
+      liveBadge.style.display = 'inline'; fpsBadge.style.display = 'inline';
+      statusText.textContent = streamUsesMicrophone
+        ? 'Microphone live'
+        : (
+          streamUsesConversationTts
+            ? 'Playing streamed speech'
+            : (streamHasAudio ? 'Playing' : 'Idle motion')
+        );
+      document.getElementById('display').classList.add('active','streaming');
+      const firstFrame = frameBuffer.get(0);
+      if (firstFrame) {
+        showBufferedFrame(0);
+      }
+    } else {
+      statusText.textContent = `Buffering... ${bufferedFrames}/${requiredFrames}`;
+    }
+    displayRaf = requestAnimationFrame(displayLoop); return;
+  }
+  let target;
+  const followingAudioClock = (
+    streamHasAudio && !(continuousIdle && audioPlayer.ended)
+  ) || streamUsesConversationTts;
+  if (!followingAudioClock) {
+    if (idleClockStartedAt === null) {
+      idleClockStartedAt = performance.now();
+      idleClockStartFrame = streamHasAudio
+        ? Math.max(showFrameIdx, totalExpectedFrames)
+        : showFrameIdx;
+      statusText.textContent = streamUsesMicrophone
+        ? 'Microphone live'
+        : (continuousIdle ? 'Idle motion' : 'Playing video');
+    }
+    target = idleClockStartFrame + Math.floor(
+      (performance.now() - idleClockStartedAt) / 1000 * streamTimelineFps,
+    );
+    target = Math.min(target, Math.max(0, state.frameCount - 1));
+    reportPlayhead(target);
+  } else {
+    const playbackTime = streamUsesConversationTts
+      ? conversationTtsPlayheadSeconds()
+      : audioPlayer.currentTime;
+    target = Math.floor(playbackTime * streamTimelineFps);
+    if (totalExpectedFrames > 0) {
+      target = Math.min(target, totalExpectedFrames - 1);
+    }
+    reportPlayhead(target);
+    const resumeFrames = rebufferTargetFrames(target);
+    const latestFrame = state.frameCount - 1;
+    const readyFrames = Math.max(0, latestFrame - target + 1);
+    if (latestFrame < target) {
+      const now = performance.now();
+      if (missingVideoFrameSince === null) missingVideoFrameSince = now;
+      if (
+        !networkRebuffering
+        && now - missingVideoFrameSince < NETWORK_STALL_GRACE_MS
+      ) {
+        displayRaf = requestAnimationFrame(displayLoop);
+        return;
+      }
+      if (streamUsesConversationTts) {
+        pauseConversationTtsForBuffering();
+      } else if (!audioPlayer.paused) {
+        audioPlayer.pause();
+      }
+      networkRebuffering = true;
+      statusText.textContent = (
+        `Frame buffering... ${readyFrames}/${resumeFrames}`
+      );
+      displayRaf = requestAnimationFrame(displayLoop);
+      return;
+    }
+    missingVideoFrameSince = null;
+    if (networkRebuffering) {
+      const bufferedFrame = bufferedFrameAtOrBefore(target);
+      if (bufferedFrame !== null) showBufferedFrame(bufferedFrame);
+      if (readyFrames < resumeFrames) {
+        statusText.textContent = (
+          `Frame buffering... ${readyFrames}/${resumeFrames}`
+        );
+        displayRaf = requestAnimationFrame(displayLoop);
+        return;
+      }
+      networkRebuffering = false;
+      statusText.textContent = 'Playing';
+      if (streamUsesConversationTts) {
+        resumeConversationTtsAfterBuffering();
+      } else {
+        audioPlayer.play().catch(() => {
+          networkRebuffering = true;
+        });
+      }
+    }
+  }
+  if (
+    continuousIdle
+    && (!streamHasAudio || audioPlayer.ended)
+    && !frameBuffer.has(target)
+    && frameBuffer.size
+  ) {
+    const oldestAvailable = frameBuffer.keys().next().value;
+    if (oldestAvailable > target) {
+      target = oldestAvailable;
+      idleClockStartFrame = oldestAvailable;
+      idleClockStartedAt = performance.now();
+    }
+  }
+  if (target > showFrameIdx) {
+    const bufferedFrame = bufferedFrameAtOrBefore(target);
+    if (bufferedFrame !== null) showBufferedFrame(bufferedFrame);
+  }
+  const retainedHistoryFrames = Math.round(2.4 * streamTimelineFps);
+  if (showFrameIdx > retainedHistoryFrames) {
+    const oldestFrame = showFrameIdx - retainedHistoryFrames;
+    for (const frameIndex of frameBuffer.keys()) {
+      if (frameIndex < oldestFrame) frameBuffer.delete(frameIndex);
+    }
+  }
+
+  // All frames rendered but audio still playing — hold last frame
+  if (showFrameIdx >= state.frameCount - 1 && state.frameCount > 0) {
+    if (
+      !continuousIdle
+      && (
+        (streamHasAudio && audioPlayer.ended)
+        || (
+          streamUsesConversationTts
+          && streamDone
+          && conversationTtsPlaybackEnded()
+        )
+        || (
+          !streamHasAudio
+          && !streamUsesConversationTts
+          && streamDone
+        )
+      )
+    ) { finalCleanup(); return; }
+    // Keep showing last frame, just continue loop
+    displayRaf = requestAnimationFrame(displayLoop);
+    return;
+  }
+
+  if (!continuousIdle && streamHasAudio && audioPlayer.ended) {
+    finalCleanup(); return;
+  }
+  if (
+    !continuousIdle
+    && streamUsesConversationTts
+    && streamDone
+    && conversationTtsPlaybackEnded()
+  ) {
+    finalCleanup(); return;
+  }
+  displayRaf = requestAnimationFrame(displayLoop);
+}
+
+function closeStreamSocket(socket = state.ws, sendStop = false) {
+  if (!socket) return;
+  if (state.ws === socket) state.ws = null;
+  socket.onopen = null;
+  socket.onmessage = null;
+  socket.onerror = null;
+  socket.onclose = null;
+  if (sendStop && socket.readyState === WebSocket.OPEN) {
+    try {
+      socket.send(JSON.stringify({ action: 'stop' }));
+    } catch (error) {
+      console.debug('Unable to stop the previous stream', error);
+    }
+  }
+  if (
+    socket.readyState === WebSocket.CONNECTING
+    || socket.readyState === WebSocket.OPEN
+  ) {
+    socket.close();
+  }
+}
+
+async function startFlowStream(options = {}) {
+  const activeSrc = state.sources.find(s => s.id === state.activeSourceId);
+  const videoDubbing = state.mode === 'video';
+  const conversationStreamId = (
+    typeof options?.conversationStreamId === 'string'
+      ? options.conversationStreamId
+      : ''
+  );
+  const conversationAudioMode = (
+    state.mode === 'conversation' && !!conversationStreamId
+  );
+  const microphoneMode = (
+    state.mode === 'audio' && state.microphoneSelected
+  );
+  const liveAudioMode = microphoneMode || conversationAudioMode;
+  const motionBufferFrames = Math.max(
+    1,
+    Math.round(+$('streamFrames').value || 50),
+  );
+  const requestedPreviewFps = Math.max(
+    1,
+    Math.min(50, Math.round(+$('previewFps').value || 25)),
+  );
+  $('previewFps').value = requestedPreviewFps;
+  $('streamFrames').value = motionBufferFrames;
+  const continuousRequested = (videoDubbing || liveAudioMode)
+    ? false
+    : $('continuousIdle').checked;
+  if (!activeSrc?.path || !activeSrc?.avatarId || !activeSrc.registered) {
+    statusText.textContent = activeSrc?.path
+      ? 'Register the active avatar before starting'
+      : 'Choose an uploaded avatar';
+    return;
+  }
+  if (sourceNeedsNeutralization(activeSrc) && !activeSrc.neutralized) {
+    statusText.textContent = 'Run Neutralize for the active avatar first';
+    return;
+  }
+  if (videoDubbing && !isVideoSource(activeSrc)) {
+    statusText.textContent = 'Video dubbing requires a registered video source';
+    return;
+  }
+  if (state.mode === 'audio' && isVideoSource(activeSrc)) {
+    statusText.textContent = 'Use Video dubbing mode for a video source';
+    return;
+  }
+  if (
+    !state.audioPath
+    && !liveAudioMode
+    && !continuousRequested
+    && !videoDubbing
+  ) {
+    statusText.textContent = (
+      'Upload audio, choose Live microphone, or enable Continuous idle'
+    );
+    return;
+  }
+  if (microphoneMode) {
+    state.microphoneFinishing = false;
+    startBtn.disabled = true;
+    statusText.textContent = 'Requesting microphone access...';
+    try {
+      await prepareLiveMicrophone();
+    } catch (error) {
+      statusText.textContent = `Microphone error: ${error.message}`;
+      updateStartButton();
+      return;
+    }
+  }
+  const replacingReusableStream = currentStreamCanBeReplaced();
+  closeStreamSocket(state.ws, true);
+  if (displayRaf) {
+    cancelAnimationFrame(displayRaf);
+    displayRaf = null;
+  }
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+  state.ws = ws; state.streaming = true; state.frameCount = 0; state.fpsTimer = performance.now();
+  state.activeSourceName = activeSrc.name;
+  const basePlaybackBufferFrames = microphoneMode
+    ? 1
+    : (
+      conversationAudioMode
+        ? Math.max(1, Math.min(10, motionBufferFrames))
+        : Math.max(
+          1,
+          Math.min(
+            motionBufferFrames,
+            Math.round(+$('playbackBufferFrames').value || 75),
+          ),
+        )
+    );
+  playbackBufferFrames = liveAudioMode && microphoneMode
+    ? 1
+    : Math.max(
+      1,
+      Math.round(
+        basePlaybackBufferFrames * requestedPreviewFps / MOTION_FPS,
+      ),
+    );
+  if (!liveAudioMode) {
+    $('playbackBufferFrames').value = basePlaybackBufferFrames;
+  }
+  frameBuffer = new Map();
+  receivedFrameCount = 0;
+  streamTimelineFps = requestedPreviewFps;
+  streamRenderFps = requestedPreviewFps;
+  totalExpectedFrames = 0;
+  streamDone = false;
+  audioStarted = false;
+  showFrameIdx = -1;
+  continuousIdle = continuousRequested;
+  streamHasAudio = !liveAudioMode && !!state.audioPath;
+  streamUsesMicrophone = microphoneMode;
+  streamUsesConversationTts = conversationAudioMode;
+  idleClockStartedAt = null;
+  idleClockStartFrame = 0;
+  networkRebuffering = false;
+  missingVideoFrameSince = null;
+  lastReportedPlayhead = -1;
+  startBtn.disabled = true; stopBtn.disabled = false;
+  fpsBadge.style.display = 'inline';
+  if (!replacingReusableStream) {
+    placeholder.style.display = 'block';
+    frameImg.style.display = 'none';
+  }
+  updateBadges(); updateStartButton();
+  displayRaf = requestAnimationFrame(displayLoop);
+  const registeredAvatarIds = state.sources
+    .filter(source => (
+      source.registered
+      && (!sourceNeedsNeutralization(source) || source.neutralized)
+      && source.avatarId
+      && isVideoSource(source) === isVideoSource(activeSrc)
+    ))
+    .map(source => source.avatarId);
+  ws.onopen = () => {
+    if (state.ws !== ws) return;
+    statusText.textContent = 'Connected';
+    ws.send(JSON.stringify({
+      source: activeSrc.path,
+      avatar_id: activeSrc.avatarId,
+      registered_avatar_ids: registeredAvatarIds,
+      audio: liveAudioMode ? null : state.audioPath,
+      microphone: microphoneMode,
+      conversation_stream_id: conversationStreamId || null,
+      lip_person_id: +$('lipPersonId').value,
+      lip_guidance_weight: +$('lipGuidance').value,
+      ...(videoDubbing ? {} : {
+        pose_person_id: +$('posePersonId').value,
+        pose_guidance_weight: +$('poseGuidance').value,
+      }),
+      sampling_steps: +$('samplingSteps').value,
+      stream_frames: motionBufferFrames,
+      render_fps: requestedPreviewFps,
+      audio_chunk_seconds: +$('audioChunkSeconds').value,
+      stage0: $('stage0').checked,
+      neutral: $('neutral').checked,
+      per_frame_normalize_delta: (
+        videoDubbing
+        && $('stage0').checked
+        && !$('neutral').checked
+        && $('perFrameNormalizeDelta').checked
+      ),
+      ditto_pose: videoDubbing
+        ? false
+        : $('dittoPose').checked,
+      paste_back: $('pasteBack').checked,
+      video_dubbing: videoDubbing,
+      continuous_idle: continuousRequested,
+    }));
+  };
+  let _pf = -1;
+  let socketDone = false;
+  ws.onmessage = (event) => {
+    if (state.ws !== ws) return;
+    if (typeof event.data === 'string') {
+      const msg = JSON.parse(event.data);
+      if (msg.t === 'f') { _pf = msg.i; return; }
+      if (msg.type === 'ready') {
+        state.modelsLoaded = true;
+        state.fpsTimer = performance.now();
+        receivedFrameCount = 0;
+        totalExpectedFrames = msg.total_frames || 0;
+        streamTimelineFps = +(msg.fps || requestedPreviewFps);
+        streamRenderFps = +(
+          msg.render_fps
+          || streamTimelineFps
+        );
+        if (msg.motion_buffer_frames > 0) {
+          playbackBufferFrames = Math.min(
+            playbackBufferFrames,
+            Math.round(msg.motion_buffer_frames),
+          );
+        }
+        reportPlayhead(0, true);
+        continuousIdle = !!msg.continuous_idle;
+        streamHasAudio = !!msg.audio_url && totalExpectedFrames > 0;
+        if (microphoneMode) {
+          activateLiveMicrophone(ws);
+        }
+        statusText.textContent = microphoneMode
+          ? 'Microphone live · speak now'
+          : (
+            conversationAudioMode
+              ? `Waiting for streamed speech · 0/${playbackBufferFrames}`
+              : `Buffering... 0/${Math.min(playbackBufferFrames, totalExpectedFrames || playbackBufferFrames)}`
+          );
+        if (streamHasAudio && state.audioUrl) {
+          audioPlayer.src = state.audioUrl;
+          audioPlayer.load();
+        } else {
+          audioPlayer.pause();
+          audioPlayer.removeAttribute('src');
+          audioPlayer.load();
+        }
+        updateStartButton();
+      } else if (msg.type === 'done') {
+        socketDone = true;
+        streamDone = true;
+        totalExpectedFrames = msg.total_frames || state.frameCount;
+        if (microphoneMode && state.frameCount === 0) {
+          finalCleanup();
+          return;
+        }
+        statusText.textContent = audioStarted
+          ? `Playing · generation complete (${state.frameCount} frames)`
+          : `Generation complete · preparing playback (${state.frameCount} frames)`;
+        updateStartButton();
+        updateFps();
+      } else if (msg.type === 'error') {
+        if (
+          msg.msg?.startsWith('Prepare this video again')
+          || msg.msg?.startsWith('Register this video again')
+          || msg.msg?.startsWith('Register this avatar again')
+        ) {
+          activeSrc.registered = false;
+          activeSrc.registrationState = 'idle';
+          activeSrc.registrationProgress = 0;
+          activeSrc.registrationMessage = msg.msg;
+          renderSources();
+          saveState();
+        }
+        statusText.textContent = `Error: ${msg.msg}`;
+        cleanup();
+      }
+      else if (msg.type === 'status') { statusText.textContent = msg.msg; }
+      return;
+    }
+    const binary = event.data instanceof ArrayBuffer
+      ? new Uint8Array(event.data)
+      : null;
+    if (
+      binary
+      && binary.length >= 4
+      && binary[0] === 0x50
+      && binary[1] === 0x43
+      && binary[2] === 0x4d
+      && binary[3] === 0x31
+    ) {
+      enqueueConversationTtsPcm(binary.subarray(4));
+      return;
+    }
+    const blob = new Blob([event.data], { type: 'image/jpeg' });
+    const idx = _pf >= 0 ? _pf : state.frameCount;
+    if (!frameBuffer.has(idx)) receivedFrameCount += 1;
+    frameBuffer.set(idx, blob);
+    state.frameCount = Math.max(state.frameCount, idx + 1);
+    _pf = -1;
+    if (continuousIdle && (!streamHasAudio || audioPlayer.ended)) {
+      const maxBufferedFrames = Math.max(
+        playbackBufferFrames + Math.round(4.8 * streamTimelineFps),
+        Math.round(9.6 * streamTimelineFps),
+      );
+      while (frameBuffer.size > maxBufferedFrames) {
+        const oldestFrame = frameBuffer.keys().next().value;
+        frameBuffer.delete(oldestFrame);
+      }
+    }
+    if (receivedFrameCount % 15 === 0) updateFps();
+  };
+  ws.onerror = () => {
+    if (state.ws !== ws) return;
+    if (!socketDone) { statusText.textContent = 'WebSocket error'; cleanup(); }
+  };
+  ws.onclose = () => {
+    if (state.ws !== ws) return;
+    state.ws = null;
+    if (!socketDone) { statusText.textContent = 'Disconnected'; cleanup(); }
+  };
+}
+startBtn.addEventListener('click', startFlowStream);
+
+function sendAudioToChunk(audioId) {
+  const audio = state.audioFiles.find(item => item.id === audioId);
+  const activeSrc = state.sources.find(item => item.id === state.activeSourceId);
+  if (!['audio', 'video'].includes(state.mode) || !audio?.path) return;
+  if (
+    (state.mode === 'audio' && activeSrc?.isVideo)
+    || (state.mode === 'video' && !activeSrc?.isVideo)
+  ) {
+    statusText.textContent = state.mode === 'video'
+      ? 'Choose a registered video source'
+      : 'Use Video dubbing mode for a video source';
+    return;
+  }
+  if (!activeSrc?.path || !activeSrc?.avatarId || !activeSrc.registered) {
+    statusText.textContent = activeSrc?.path
+      ? 'Register the active avatar before sending audio'
+      : 'Choose an uploaded avatar';
+    return;
+  }
+  if (state.streaming && !audioStreamIsReusable()) {
+    statusText.textContent = 'The current chunk is still generating';
+    return;
+  }
+  state.microphoneSelected = false;
+  state.activeAudioId = audio.id;
+  state.audioPath = audio.path;
+  state.audioUrl = audio.url;
+  renderAudio();
+  updateMotionControlState();
+  saveState();
+  statusText.textContent = `Sending ${audio.name} to motion chunk...`;
+  startFlowStream();
+}
+
+function appendChatMessage(role, text = '') {
+  chatEmpty.hidden = true;
+  const message = document.createElement('div');
+  message.className = `chat-message ${role}`;
+  message.textContent = text;
+  chatMessages.appendChild(message);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return message;
+}
+
+function installConversationAudio(event) {
+  const id = `conversation_audio_${crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now()}`;
+  state.audioFiles.push({
+    id,
+    name: event.name || 'response.wav',
+    path: event.path,
+    url: event.url,
+    file: null,
+    error: false,
+  });
+  state.activeAudioId = id;
+  state.audioPath = event.path;
+  state.audioUrl = event.url;
+  audioPlayer.src = event.url;
+  audioPlayer.load();
+  renderAudio();
+}
+
+async function sendConversationMessage(explicitText = null) {
+  const text = (explicitText ?? chatInput.value).trim();
+  const activeSrc = state.sources.find(s => s.id === state.activeSourceId);
+  if (
+    !text
+    || !activeSrc?.path
+    || !activeSrc?.avatarId
+    || !activeSrc.registered
+    || state.conversationBusy
+    || (state.streaming && !conversationStreamIsReusable())
+  ) {
+    if (text && activeSrc?.path && !activeSrc.registered) {
+      statusText.textContent = 'Register the active avatar before starting a conversation';
+    }
+    return;
+  }
+
+  appendChatMessage('user', text);
+  const assistantMessage = appendChatMessage('assistant pending');
+  chatInput.value = '';
+  state.conversationBusy = true;
+  state.chatAbort = new AbortController();
+  statusText.textContent = 'Thinking...';
+  updateStartButton();
+
+  let audioEvent = null;
+  let conversationStreamStarted = false;
+  const streamingTtsEnabled = $('streamingTts').checked;
+  try {
+    if (streamingTtsEnabled) {
+      await prepareConversationTtsAudio();
+    } else {
+      stopConversationTtsAudio();
+    }
+    const response = await fetch('/api/conversation/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: state.chatAbort.signal,
+      body: JSON.stringify({
+        conversation_id: state.conversationId,
+        message: text,
+        system_prompt: $('systemPrompt').value.trim() || null,
+        model: $('llmModel').value.trim() || null,
+        tts_provider: $('ttsProvider').value || null,
+        tts_model: $('ttsModel').value.trim() || null,
+        voice: $('ttsVoice').value.trim() || null,
+        streaming_tts: streamingTtsEnabled,
+      }),
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(await response.text() || `HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+        if (event.type === 'delta') {
+          assistantMessage.textContent += event.text || '';
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        } else if (event.type === 'reply_finished') {
+          assistantMessage.textContent = event.text || assistantMessage.textContent;
+          assistantMessage.classList.remove('pending');
+        } else if (event.type === 'tts_started') {
+          statusText.textContent = 'Synthesizing speech...';
+        } else if (event.type === 'tts_stream_started') {
+          statusText.textContent = 'Opening streaming speech channel...';
+          await startFlowStream({
+            conversationStreamId: event.stream_id,
+          });
+          conversationStreamStarted = (
+            state.streaming && streamUsesConversationTts
+          );
+          if (!conversationStreamStarted) {
+            throw new Error('Unable to start the streaming speech channel');
+          }
+        } else if (event.type === 'audio_chunk_ready') {
+          statusText.textContent = (
+            `Streaming speech segment ${(event.index ?? 0) + 1}...`
+          );
+        } else if (event.type === 'audio_ready') {
+          audioEvent = event;
+        } else if (event.type === 'error') {
+          throw new Error(event.msg || 'Conversation failed');
+        }
+      }
+      if (done) break;
+    }
+
+    assistantMessage.classList.remove('pending');
+    if (!audioEvent) throw new Error('The response audio was not generated');
+    installConversationAudio(audioEvent);
+    statusText.textContent = conversationStreamStarted
+      ? (state.streaming ? 'Streaming conversation...' : 'Ready for next message')
+      : 'Preparing TalkLikeYou...';
+  } catch (error) {
+    assistantMessage.classList.remove('pending');
+    if (error.name === 'AbortError') {
+      if (!assistantMessage.textContent) assistantMessage.remove();
+      statusText.textContent = 'Stopped';
+    } else {
+      if (!assistantMessage.textContent) assistantMessage.textContent = `Error: ${error.message}`;
+      statusText.textContent = `Conversation error: ${error.message}`;
+    }
+    if (conversationStreamStarted) cleanup();
+    else stopConversationTtsAudio();
+  } finally {
+    state.chatAbort = null;
+    state.conversationBusy = false;
+    updateStartButton();
+  }
+
+  if (audioEvent && !conversationStreamStarted) {
+    stopConversationTtsAudio();
+    startFlowStream();
+  }
+}
+
+sendBtn.addEventListener('click', () => sendConversationMessage());
+chatInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendConversationMessage();
+  }
+});
+
+let mediaRecorder = null;
+let recordingStream = null;
+let recordingChunks = [];
+let speechRecognition = null;
+
+recordBtn.addEventListener('click', async () => {
+  if (speechRecognition) {
+    speechRecognition.stop();
+    return;
+  }
+  if (mediaRecorder?.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+  if (!state.sttConfigured) {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      statusText.textContent = 'STT is not configured';
+      return;
+    }
+    const recognition = new Recognition();
+    speechRecognition = recognition;
+    recognition.lang = navigator.language || 'zh-CN';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recordBtn.classList.add('recording');
+    recordBtn.textContent = 'Stop';
+    statusText.textContent = 'Listening...';
+    recognition.onresult = event => {
+      const text = event.results?.[0]?.[0]?.transcript || '';
+      if (text.trim()) sendConversationMessage(text);
+    };
+    recognition.onerror = event => {
+      recordBtn.classList.remove('recording');
+      recordBtn.textContent = 'Record';
+      statusText.textContent = `Speech recognition error: ${event.error}`;
+    };
+    recognition.onend = () => {
+      speechRecognition = null;
+      recordBtn.classList.remove('recording');
+      recordBtn.textContent = 'Record';
+      updateStartButton();
+    };
+    recognition.start();
+    return;
+  }
+  try {
+    recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordingChunks = [];
+    chatInput.value = '';
+    mediaRecorder = new MediaRecorder(recordingStream);
+    mediaRecorder.ondataavailable = event => {
+      if (event.data.size) recordingChunks.push(event.data);
+    };
+    mediaRecorder.onstop = async () => {
+      recordingStream?.getTracks().forEach(track => track.stop());
+      recordingStream = null;
+      recordBtn.classList.remove('recording');
+      recordBtn.textContent = 'Record';
+      state.conversationBusy = true;
+      statusText.textContent = 'Transcribing...';
+      updateStartButton();
+      try {
+        const blob = new Blob(
+          recordingChunks,
+          { type: mediaRecorder.mimeType || 'audio/webm' },
+        );
+        const form = new FormData();
+        form.append('file', blob, 'recording.webm');
+        const response = await fetch(
+          '/api/conversation/transcribe',
+          { method: 'POST', body: form },
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || 'Transcription failed');
+        chatInput.value = payload.text || '';
+      } catch (error) {
+        statusText.textContent = `STT error: ${error.message}`;
+      } finally {
+        state.conversationBusy = false;
+        updateStartButton();
+      }
+      if (chatInput.value.trim()) sendConversationMessage();
+    };
+    mediaRecorder.start(250);
+    recordBtn.classList.add('recording');
+    recordBtn.textContent = 'Stop';
+    statusText.textContent = 'Recording...';
+  } catch (error) {
+    statusText.textContent = `Microphone error: ${error.message}`;
+  }
+});
+
+clearChatBtn.addEventListener('click', async () => {
+  state.chatAbort?.abort();
+  speechRecognition?.stop();
+  await fetch('/api/conversation/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversation_id: state.conversationId }),
+  }).catch(() => {});
+  chatMessages.querySelectorAll('.chat-message').forEach(message => message.remove());
+  chatEmpty.hidden = false;
+  statusText.textContent = 'Conversation cleared';
+});
+
+stopBtn.addEventListener('click', () => {
+  state.chatAbort?.abort();
+  speechRecognition?.stop();
+  if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+  if (state.microphoneStreaming) {
+    state.microphoneFinishing = true;
+    stopLiveMicrophone(true);
+    stopBtn.disabled = true;
+    statusText.textContent = 'Finishing microphone stream...';
+    return;
+  }
+  stopLiveMicrophone(false);
+  closeStreamSocket(state.ws, true);
+  statusText.textContent = 'Stopped';
+  cleanup();
+});
+
+function cleanup() {
+  state.streaming = false;
+  state.microphoneFinishing = false;
+  stopLiveMicrophone(false);
+  stopConversationTtsAudio();
+  closeStreamSocket();
+  if (displayRaf) { cancelAnimationFrame(displayRaf); displayRaf = null; }
+  frameBuffer.clear();
+  frameBuffer = new Map();
+  audioStarted = false;
+  continuousIdle = false;
+  streamHasAudio = false;
+  streamUsesMicrophone = false;
+  streamUsesConversationTts = false;
+  idleClockStartedAt = null;
+  networkRebuffering = false;
+  missingVideoFrameSince = null;
+  if (!streamDone) audioPlayer.pause();
+  liveBadge.style.display = 'none'; startBtn.disabled = false; stopBtn.disabled = true;
+  document.getElementById('display').classList.remove('active','streaming');
+  updateStartButton(); updateFps();
+}
+function finalCleanup() {
+  state.streaming = false;
+  state.microphoneFinishing = false;
+  stopLiveMicrophone(false);
+  stopConversationTtsAudio();
+  closeStreamSocket();
+  if (displayRaf) { cancelAnimationFrame(displayRaf); displayRaf = null; }
+  frameBuffer.clear();
+  continuousIdle = false;
+  streamHasAudio = false;
+  streamUsesMicrophone = false;
+  streamUsesConversationTts = false;
+  idleClockStartedAt = null;
+  networkRebuffering = false;
+  missingVideoFrameSince = null;
+  liveBadge.style.display = 'none'; startBtn.disabled = false; stopBtn.disabled = true;
+  statusText.textContent = state.mode === 'conversation'
+    ? 'Ready for next message'
+    : (
+      state.mode === 'audio' && state.microphoneSelected
+        ? `Microphone stopped · ${state.frameCount} frames`
+        : `Playback complete · ${state.frameCount} frames`
+    );
+  updateStartButton(); updateFps();
+}
+function updateFps() {
+  const elapsed = (performance.now() - state.fpsTimer) / 1000;
+  if (elapsed > 0 && receivedFrameCount > 0) {
+    fpsBadge.textContent = (
+      `${(receivedFrameCount / elapsed).toFixed(1)}`
+      + `/${streamRenderFps.toFixed(0)} fps`
+    );
+  }
+}
+
+function updateMotionControlState() {
+  const videoDubbing = state.mode === 'video';
+  const liveMicrophone = (
+    state.mode === 'audio' && state.microphoneSelected
+  );
+  $('stage0').disabled = false;
+  $('neutral').disabled = false;
+  const perFrameNormalizeAllowed = (
+    videoDubbing && $('stage0').checked && !$('neutral').checked
+  );
+  $('perFrameNormalizeDeltaRow').hidden = !videoDubbing;
+  $('perFrameNormalizeDelta').disabled = !perFrameNormalizeAllowed;
+  $('posePersonIdSetting').hidden = videoDubbing;
+  $('poseGuidanceSetting').hidden = videoDubbing;
+  $('dittoPoseRow').hidden = videoDubbing;
+  $('dittoPose').disabled = videoDubbing;
+  $('continuousIdle').disabled = videoDubbing || liveMicrophone;
+  $('microphonePlaybackRow').hidden = !liveMicrophone;
+  const poseControlsDisabled = (
+    videoDubbing || $('dittoPose').checked
+  );
+  $('posePersonId').disabled = poseControlsDisabled;
+  $('poseGuidance').disabled = poseControlsDisabled;
+}
+
+$('dittoPose').addEventListener('change', updateMotionControlState);
+$('stage0').addEventListener('change', () => {
+  updateMotionControlState();
+  updateStartButton();
+});
+$('neutral').addEventListener('change', () => {
+  updateMotionControlState();
+  updateStartButton();
+});
+$('faceIdx').addEventListener('change', () => {
+  currentAvatarCropSettings();
+  invalidateAvatarRegistrations(
+    'Face index changed · register avatars again',
+    true,
+  );
+});
+$('cropScale').addEventListener('change', () => {
+  currentAvatarCropSettings();
+  invalidateAvatarRegistrations(
+    'Crop scale changed · register avatars again',
+    true,
+  );
+});
+$('continuousIdle').addEventListener('change', updateStartButton);
+$('microphonePlayback').addEventListener(
+  'change',
+  updateLiveMicrophonePlaybackGain,
+);
+$('ttsProvider').addEventListener('change', () => updateTtsProviderChoices(true));
+$('streamingTts').addEventListener('change', () => {
+  saveState();
+  updateConversationSummary();
+});
+$('llmModel').addEventListener('change', updateConversationSummary);
+$('ttsModel').addEventListener('change', updateConversationSummary);
+$('ttsVoice').addEventListener('change', updateConversationSummary);
+
+const requestedMode = new URLSearchParams(location.search).get('mode');
+const initialMode = requestedMode || localStorage.getItem('talklikeyou_input_mode');
+if (initialMode === 'conversation' || initialMode === 'video') {
+  setMode(initialMode);
+}
+loadState();
+</script>
+</body>
+</html>

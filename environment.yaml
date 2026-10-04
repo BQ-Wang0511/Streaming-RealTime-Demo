@@ -1,0 +1,15 @@
+name: talklikeyou-demo
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch=2.5.1
+  - pytorch-cuda=12.1
+  - cudnn=9
+  - c-compiler
+  - ffmpeg
+  - pip
+  - pip:
+      - -r requirements.txt
