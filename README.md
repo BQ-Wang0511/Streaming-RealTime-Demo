@@ -1,14 +1,10 @@
-# Talk Like You: Imitating How You Speak in Real-Time Talking Head Generation
+# Talk Like You Real-Time Demo
 
-[Baiqin Wang](https://scholar.google.cz/citations?user=pBF9Mn8AAAAJ&hl=zh-CN&oi=ao), Zhixing Ding, Jijie Li, Jiankuo Zhao, [Zhen Lei](https://scholar.google.cz/citations?hl=zh-CN&user=cuJ3QG8AAAAJ), [Xiangyu Zhu](https://xiangyuzhu-open.github.io/homepage/)
-
-MAIS, Institute of Automation, Chinese Academy of Sciences; University of Chinese Academy of Sciences; CAIR, HKISI, Chinese Academy of Sciences; Macau University of Science and Technology
+This browser demo generates talking-head video in real time. Animate an image using uploaded audio or a live microphone, dub a source video while preserving its pose and timing, or connect a chat agent for interactive speech-driven animation. Preset habit IDs let you switch between speaking styles without a reference video.
 
 [Project Page](https://bq-wang0511.github.io/TalkLikeYou/) · [Hugging Face](https://huggingface.co/doubi-killer/TalkLikeYou) · [TalkLikeYou Public Code](https://github.com/BQ-Wang0511/TalkLikeYou)
 
 Paper: coming soon.
-
-This is the official real-time browser demo for the paper **Talk Like You: Imitating How You Speak in Real-Time Talking Head Generation**. The paper introduces habit-aware, audio-driven talking-head generation with a one-step Flow Matching Motion Generator. The main public repository provides image/video inference and reference-habit imitation; this demo focuses on preset habit IDs and interactive streaming.
 
 The source release includes the inference code, portrait runtime, and frontend. Model checkpoints are installed separately under the local `checkpoints/` directory; runtime code never reads files from another repository.
 
@@ -208,33 +204,7 @@ The default paths can be overridden with `--lip_ckpt`, `--pose_ckpt`, `--data_ro
 
 ## Acknowledgements
 
-This demo builds on [LivePortrait](https://github.com/KwaiVGI/LivePortrait), [Ditto](https://github.com/antgroup/ditto-talkinghead), and our previous work PC-Talk. We thank their authors for making their work available.
-
-## References
-
-```bibtex
-@article{guo2024liveportrait,
-  title={LivePortrait: Efficient Portrait Animation with Stitching and Retargeting Control},
-  author={Guo, Jianzhu and Zhang, Dingyun and Liu, Xiaoqiang and Zhong, Zhizhou and Zhang, Yuan and Wan, Pengfei and Zhang, Di},
-  journal={arXiv preprint arXiv:2407.03168},
-  year={2024}
-}
-
-@article{li2024ditto,
-  title={Ditto: Motion-Space Diffusion for Controllable Realtime Talking Head Synthesis},
-  author={Li, Tianqi and Zheng, Ruobing and Yang, Minghui and Chen, Jingdong and Yang, Ming},
-  journal={arXiv preprint arXiv:2411.19509},
-  year={2024}
-}
-
-@inproceedings{wang2026pc,
-  title={PC-Talk: Precise Facial Animation Control for Audio-Driven Talking Face Generation},
-  author={Wang, Baiqin and Zhu, Xiangyu and Shen, Fan and Xu, Hao and Lei, Zhen},
-  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  pages={25153--25162},
-  year={2026}
-}
-```
+The portrait renderer incorporates components adapted from [Ditto](https://github.com/antgroup/ditto-talkinghead), and portrait preprocessing incorporates components adapted from [LivePortrait](https://github.com/KwaiVGI/LivePortrait). We thank both teams for releasing their work. See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for the applicable licenses.
 
 ## License
 
