@@ -2,6 +2,8 @@
 
 This browser demo generates talking-head video in real time. Animate an image using uploaded audio or a live microphone, dub a source video while preserving its pose and timing, or connect a chat agent for interactive speech-driven animation. Preset habit IDs let you switch between speaking styles without a reference video.
 
+**On an NVIDIA RTX 3090, the demo achieves 30+ FPS generation throughput while using less than 12 GB of GPU memory.**
+
 ![TalkLikeYou streaming demo interface](assets/demo-interface.png)
 
 [![Project Page](https://img.shields.io/badge/Project-Page-2ea44f?logo=googlechrome&logoColor=white)](https://bq-wang0511.github.io/TalkLikeYou/)
