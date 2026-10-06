@@ -4,9 +4,7 @@ This browser demo generates talking-head video in real time. Animate an image us
 
 ![TalkLikeYou streaming demo interface](assets/demo-interface.png)
 
-[Project Page](https://bq-wang0511.github.io/TalkLikeYou/) · [Hugging Face](https://huggingface.co/doubi-killer/TalkLikeYou) · [TalkLikeYou Public Code](https://github.com/BQ-Wang0511/TalkLikeYou)
-
-Paper: coming soon.
+[Paper](https://arxiv.org/abs/2610.06658) · [Project Page](https://bq-wang0511.github.io/TalkLikeYou/) · [Hugging Face](https://huggingface.co/doubi-killer/TalkLikeYou) · [TalkLikeYou Public Code](https://github.com/BQ-Wang0511/TalkLikeYou)
 
 The source release includes the inference code, portrait runtime, and frontend. Model checkpoints are installed separately under the local `checkpoints/` directory; runtime code never reads files from another repository.
 
