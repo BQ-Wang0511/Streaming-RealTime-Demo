@@ -4,7 +4,10 @@ This browser demo generates talking-head video in real time. Animate an image us
 
 ![TalkLikeYou streaming demo interface](assets/demo-interface.png)
 
-[Paper](https://arxiv.org/abs/2610.06658) · [Project Page](https://bq-wang0511.github.io/TalkLikeYou/) · [Hugging Face](https://huggingface.co/doubi-killer/TalkLikeYou) · [TalkLikeYou Public Code](https://github.com/BQ-Wang0511/TalkLikeYou)
+[![Project Page](https://img.shields.io/badge/Project-Page-2ea44f?logo=googlechrome&logoColor=white)](https://bq-wang0511.github.io/TalkLikeYou/)
+[![Paper](https://img.shields.io/badge/arXiv-Paper-B31B1B?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2610.06658)
+[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Checkpoints-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/doubi-killer/TalkLikeYou)
+[![TalkLikeYou Code](https://img.shields.io/badge/GitHub-Code-181717?logo=github&logoColor=white)](https://github.com/BQ-Wang0511/TalkLikeYou)
 
 The source release includes the inference code, portrait runtime, and frontend. Model checkpoints are installed separately under the local `checkpoints/` directory; runtime code never reads files from another repository.
 
