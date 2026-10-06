@@ -212,3 +212,7 @@ The portrait renderer incorporates components adapted from [Ditto](https://githu
 ## License
 
 The demo code is released under the [MIT License](LICENSE). Third-party code and model files retain their original terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Contact
+
+For questions, contact [wangbaiqin0511@gmail.com](mailto:wangbaiqin0511@gmail.com).
