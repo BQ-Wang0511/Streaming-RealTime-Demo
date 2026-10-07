@@ -17,7 +17,7 @@
 
 ## 视频展示
 
-[![观看 Demo 视频](assets/demo-interface.png)](https://bq-wang0511.github.io/TalkLikeYou/static/videos/realtime-demo.mp4)
+<video src="https://github.com/user-attachments/assets/bea580f3-7d1b-419a-9665-b69113b94e35" controls preload="metadata"></video>
 
 [观看 Demo 视频](https://bq-wang0511.github.io/TalkLikeYou/static/videos/realtime-demo.mp4)
 
