@@ -17,7 +17,7 @@
 
 ## 视频展示
 
-<video src="assets/demo.mp4" controls width="100%"></video>
+[![观看 Demo 视频](assets/demo-interface.png)](assets/demo.mp4)
 
 [观看 Demo 视频](assets/demo.mp4)
 

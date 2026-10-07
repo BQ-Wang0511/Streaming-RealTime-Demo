@@ -17,7 +17,7 @@ The source release includes the inference code, portrait runtime, and frontend. 
 
 ## Video showcase
 
-<video src="assets/demo.mp4" controls width="100%"></video>
+[![Watch the demo video](assets/demo-interface.png)](assets/demo.mp4)
 
 [Watch the demo video](assets/demo.mp4)
 
