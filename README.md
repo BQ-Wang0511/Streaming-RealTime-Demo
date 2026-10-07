@@ -17,9 +17,9 @@ The source release includes the inference code, portrait runtime, and frontend. 
 
 ## Video showcase
 
-[![Watch the demo video](assets/demo-interface.png)](assets/demo.mp4)
+[![Watch the demo video](assets/demo-interface.png)](https://bq-wang0511.github.io/TalkLikeYou/static/videos/realtime-demo.mp4)
 
-[Watch the demo video](assets/demo.mp4)
+[Watch the demo video](https://bq-wang0511.github.io/TalkLikeYou/static/videos/realtime-demo.mp4)
 
 ## Features
 

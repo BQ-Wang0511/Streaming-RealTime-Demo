@@ -17,9 +17,9 @@
 
 ## 视频展示
 
-[![观看 Demo 视频](assets/demo-interface.png)](assets/demo.mp4)
+[![观看 Demo 视频](assets/demo-interface.png)](https://bq-wang0511.github.io/TalkLikeYou/static/videos/realtime-demo.mp4)
 
-[观看 Demo 视频](assets/demo.mp4)
+[观看 Demo 视频](https://bq-wang0511.github.io/TalkLikeYou/static/videos/realtime-demo.mp4)
 
 ## 功能
 
