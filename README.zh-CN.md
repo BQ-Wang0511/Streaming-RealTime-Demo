@@ -15,6 +15,12 @@
 
 本仓库包含推理代码、人像运行模块和前端。模型权重需另行放入本地 `checkpoints/` 目录；运行时代码不会读取其他仓库中的文件。
 
+## 视频展示
+
+<video src="assets/demo.mp4" controls width="100%"></video>
+
+[观看 Demo 视频](assets/demo.mp4)
+
 ## 功能
 
 界面提供三种模式：

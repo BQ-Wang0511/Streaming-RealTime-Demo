@@ -15,6 +15,12 @@ This browser demo generates talking-head video in real time. Animate an image us
 
 The source release includes the inference code, portrait runtime, and frontend. Model checkpoints are installed separately under the local `checkpoints/` directory; runtime code never reads files from another repository.
 
+## Video showcase
+
+<video src="assets/demo.mp4" controls width="100%"></video>
+
+[Watch the demo video](assets/demo.mp4)
+
 ## Features
 
 The interface provides three modes:
